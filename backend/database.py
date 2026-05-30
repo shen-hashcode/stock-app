@@ -7,8 +7,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./stock_app.db")
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:password@localhost:3306/stock_app")
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=3600,
+    echo=False
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -16,7 +22,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     openid = Column(String(100), unique=True, index=True)
     nickname = Column(String(50))
     phone = Column(String(20))
@@ -29,7 +35,7 @@ class User(Base):
 class Strategy(Base):
     __tablename__ = "strategies"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     name = Column(String(100))
     description = Column(Text)
@@ -46,7 +52,7 @@ class Strategy(Base):
 class StrategyResult(Base):
     __tablename__ = "strategy_results"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     strategy_id = Column(Integer, ForeignKey("strategies.id"))
     run_date = Column(String(20))
     stocks_json = Column(Text)  # JSON格式存储筛选结果

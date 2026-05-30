@@ -4,7 +4,7 @@
 
 Stock screening WeChat mini-app with Python/FastAPI backend.
 
-- `backend/` - FastAPI server (port 8000), SQLite database, APScheduler for daily tasks
+- `backend/` - FastAPI server (port 8000), MySQL database, APScheduler for daily tasks
 - `miniapp/` - WeChat mini-program frontend (no build step, edit files directly)
 
 ## Backend Development
@@ -15,7 +15,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Server starts at http://localhost:8000. Database tables auto-create on startup.
+Server starts at http://localhost:8000. Run `mysql -u root -p < init.sql` to initialize database first.
 
 ## Key Architecture
 
@@ -30,7 +30,7 @@ Server starts at http://localhost:8000. Database tables auto-create on startup.
 Copy `backend/.env` and configure:
 - `WECHAT_APPID` / `WECHAT_SECRET` - WeChat miniapp credentials
 - `LLM_API_KEY` / `LLM_API_URL` / `LLM_MODEL` - DeepSeek/ChatGPT for AI strategy generation
-- `DATABASE_URL` - defaults to `sqlite:///./stock_app.db`
+- `DATABASE_URL` - defaults to `mysql+pymysql://root:password@localhost:3306/stock_app`
 - `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` - daily strategy execution time
 
 ## Important Patterns

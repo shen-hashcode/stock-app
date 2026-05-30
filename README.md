@@ -37,7 +37,10 @@ pip install -r requirements.txt
 # 编辑 .env 文件，填入：
 # - 微信小程序 appid/secret
 # - 大模型API key (DeepSeek/ChatGPT等)
-# - 数据库配置
+# - MySQL数据库连接信息
+
+# 初始化数据库（首次运行）
+mysql -u root -p < init.sql
 
 # 启动服务
 python main.py
@@ -198,7 +201,7 @@ SCHEDULE_MINUTE=30       # 执行分钟（0-59）
 
 #### 6.1 后端技术栈
 - **Web框架**：FastAPI（高性能异步框架）
-- **数据库**：SQLite（开发）/ PostgreSQL（生产）
+- **数据库**：MySQL 8.0+
 - **ORM**：SQLAlchemy（数据库映射）
 - **定时任务**：APScheduler（任务调度）
 - **数据请求**：Requests（HTTP客户端）
@@ -390,15 +393,12 @@ init_db()
 
 **自动创建：**
 - 系统启动时自动检查并创建表结构
-- 支持SQLite（开发环境）和PostgreSQL（生产环境）
+- 也可手动执行 `init.sql` 初始化数据库
 
 **环境配置：**
 ```env
-# SQLite（默认）
-DATABASE_URL=sqlite:///./stock_app.db
-
-# PostgreSQL
-DATABASE_URL=postgresql://user:password@localhost/stock_app
+# MySQL
+DATABASE_URL=mysql+pymysql://root:password@localhost:3306/stock_app
 ```
 
 ### 7. 使用场景
@@ -445,7 +445,7 @@ DATABASE_URL=postgresql://user:password@localhost/stock_app
 ### 后端
 - 使用 Gunicorn + Uvicorn 部署
 - 配置 Nginx 反向代理
-- 使用 PostgreSQL 替代 SQLite
+- 使用 MySQL 8.0+ 数据库
 
 ### 小程序
 - 需要注册微信小程序账号
