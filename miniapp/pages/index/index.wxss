@@ -1,0 +1,52 @@
+page {
+  background-color: #f5f5f5;
+}
+
+.container {
+  padding: 20rpx;
+}
+
+.subtitle {
+  font-size: 26rpx;
+  color: #666;
+  margin-top: 10rpx;
+}
+
+.strategy-list {
+  margin-top: 20rpx;
+}
+
+.strategy-item {
+  background: #f8f9fa;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+}
+
+.strategy-name {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.strategy-desc {
+  font-size: 24rpx;
+  color: #666;
+  margin-top: 8rpx;
+}
+
+.strategy-params {
+  margin-top: 12rpx;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.custom-form {
+  margin-top: 20rpx;
+}
+
+.textarea {
+  height: 200rpx;
+  width: 100%;
+  box-sizing: border-box;
+}

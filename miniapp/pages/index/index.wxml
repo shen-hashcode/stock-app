@@ -1,0 +1,31 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <view class="card">
+    <view class="card-title">智能选股助手</view>
+    <view class="subtitle">AI帮你量身定制选股策略</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">热门策略</view>
+    <view class="strategy-list">
+      <view class="strategy-item" wx:for="{{builtinStrategies}}" wx:key="key" bindtap="selectStrategy" data-key="{{item.key}}">
+        <view class="strategy-name">{{item.name}}</view>
+        <view class="strategy-desc">{{item.description}}</view>
+        <view class="strategy-params">
+          <view class="tag" wx:for="{{item.params}}" wx:for-item="param" wx:key="label">
+            {{param.label}}: {{param.default}}
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">自定义策略</view>
+    <view class="custom-form">
+      <input class="input" placeholder="策略名称" bindinput="onNameInput" value="{{customName}}" />
+      <textarea class="input textarea" placeholder="描述你的选股条件，例如：&#10;前3天累计涨幅超过15%，第4天回调，市值大于100亿" bindinput="onDescInput" value="{{customDesc}}" />
+      <view class="btn-primary" bindtap="createCustomStrategy">AI生成策略</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,108 @@
+.strategy-list {
+  margin-top: 20rpx;
+}
+
+.strategy-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.strategy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.strategy-name {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.strategy-desc {
+  font-size: 24rpx;
+  color: #666;
+  margin-top: 12rpx;
+}
+
+.strategy-actions {
+  display: flex;
+  margin-top: 20rpx;
+  gap: 20rpx;
+}
+
+.btn-run {
+  flex: 1;
+  background: #1a73e8;
+  color: #fff;
+  text-align: center;
+  padding: 16rpx;
+  border-radius: 8rpx;
+  font-size: 26rpx;
+}
+
+.btn-result {
+  flex: 1;
+  background: #f0f0f0;
+  color: #333;
+  text-align: center;
+  padding: 16rpx;
+  border-radius: 8rpx;
+  font-size: 26rpx;
+}
+
+.empty {
+  text-align: center;
+  padding: 100rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.modal-mask {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 40rpx;
+  max-height: 80vh;
+}
+
+.modal-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.result-count {
+  font-size: 28rpx;
+  color: #666;
+  text-align: center;
+  margin-bottom: 30rpx;
+}
+
+.result-list {
+  max-height: 50vh;
+  margin-bottom: 30rpx;
+}

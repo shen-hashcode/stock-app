@@ -1,0 +1,85 @@
+page {
+  background-color: #f5f5f5;
+}
+
+.container {
+  padding: 20rpx;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+}
+
+.btn-primary {
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 12rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+
+.btn-primary:active {
+  background: #1557b0;
+}
+
+.input {
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.tag {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1a73e8;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  margin-right: 10rpx;
+  margin-bottom: 10rpx;
+}
+
+.stock-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.stock-name {
+  font-size: 30rpx;
+  color: #333;
+}
+
+.stock-code {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.stock-change {
+  font-size: 28rpx;
+  font-weight: bold;
+}
+
+.stock-change.up {
+  color: #e74c3c;
+}
+
+.stock-change.down {
+  color: #27ae60;
+}

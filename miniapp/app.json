@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/strategy/strategy",
+    "pages/result/result"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#1a73e8",
+    "navigationBarTitleText": "智能选股",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#1a73e8",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "images/home.png",
+        "selectedIconPath": "images/home-active.png"
+      },
+      {
+        "pagePath": "pages/strategy/strategy",
+        "text": "策略",
+        "iconPath": "images/strategy.png",
+        "selectedIconPath": "images/strategy-active.png"
+      },
+      {
+        "pagePath": "pages/result/result",
+        "text": "结果",
+        "iconPath": "images/result.png",
+        "selectedIconPath": "images/result-active.png"
+      }
+    ]
+  }
+}
