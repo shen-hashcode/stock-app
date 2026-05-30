@@ -30,7 +30,7 @@ Server starts at http://localhost:8000. Run `mysql -u root -p < init.sql` to ini
 Copy `backend/.env` and configure:
 - `WECHAT_APPID` / `WECHAT_SECRET` - WeChat miniapp credentials
 - `LLM_API_KEY` / `LLM_API_URL` / `LLM_MODEL` - DeepSeek/ChatGPT for AI strategy generation
-- `DATABASE_URL` - defaults to `mysql+pymysql://root:password@localhost:3306/stock_app`
+- `DATABASE_URL` - defaults to `mysql+pymysql://root:root@localhost:3306/stock_app`
 - `SCHEDULE_HOUR` / `SCHEDULE_MINUTE` - daily strategy execution time
 
 ## Important Patterns

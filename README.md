@@ -398,7 +398,7 @@ init_db()
 **环境配置：**
 ```env
 # MySQL
-DATABASE_URL=mysql+pymysql://root:password@localhost:3306/stock_app
+DATABASE_URL=mysql+pymysql://root:root@localhost:3306/stock_app
 ```
 
 ### 7. 使用场景
