@@ -9,7 +9,10 @@ from datetime import datetime
 
 from database import init_db, get_db, User, Strategy, StrategyResult
 from stock_service import get_stock_list, run_strategy, get_kline_data, get_realtime_quote
-from strategies.builtin import STRATEGIES
+from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
+from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
+
+STRATEGIES = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
 from scheduler import start_scheduler
 
 
@@ -175,6 +178,42 @@ async def run_strategy_by_id(strategy_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/strategies/builtin/{strategy_key}/run")
+async def run_builtin_strategy(
+    strategy_key: str,
+    params: Optional[dict] = None,
+    stock_limit: int = 0
+):
+    if strategy_key not in STRATEGIES:
+        raise HTTPException(status_code=404, detail="策略不存在")
+
+    try:
+        builtin_strategy = STRATEGIES[strategy_key]
+        strategy_params = {k: v.get("default") for k, v in builtin_strategy["params"].items()}
+        if params:
+            strategy_params.update(params)
+
+        check_func = lambda stock, func=builtin_strategy["func"], p=strategy_params: func(stock, **p)
+
+        stock_list = get_stock_list()
+        if stock_limit > 0:
+            stock_list = stock_list[:stock_limit]
+
+        results = []
+        for stock in stock_list:
+            try:
+                if check_func(stock):
+                    quote = get_realtime_quote(stock['code'], stock['market'])
+                    stock['quote'] = quote
+                    results.append(stock)
+            except:
+                continue
+
+        return {"code": 0, "data": {"count": len(results), "stocks": results, "params": strategy_params}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/results/{strategy_id}")
 def get_strategy_results(strategy_id: int, limit: int = 10, db: Session = Depends(get_db)):
     results = db.query(StrategyResult)\
@@ -192,7 +231,7 @@ def get_stock_info(code: str, market: str):
     
     kline_data = []
     if kline is not None:
-        kline_data = kline.tail(10).to_dict('records')
+        kline_data = kline[-10:] if len(kline) > 10 else kline
     
     return {
         "code": 0,
