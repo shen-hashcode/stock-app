@@ -28,4 +28,4 @@ app:
   llm:
     api-key: sk-2dwaFIkbAlVwTVIrPYIMKA9vOT9qPZeZJS3XUhQGLAmdMejN
     api-url: https://api.siliconflow.cn/v1/chat/completions
-    model: Qwen/MiMo-7B-RL
+    model: deepseek-ai/DeepSeek-V2.5
