@@ -26,6 +26,6 @@ app:
     hour: 16
     minute: 0
   llm:
-    api-key: ${LLM_API_KEY:}
-    api-url: ${LLM_API_URL:https://api.deepseek.com/v1/chat/completions}
-    model: ${LLM_MODEL:deepseek-chat}
+    api-key: sk-2dwaFIkbAlVwTVIrPYIMKA9vOT9qPZeZJS3XUhQGLAmdMejN
+    api-url: https://api.siliconflow.cn/v1/chat/completions
+    model: Qwen/MiMo-7B-RL
