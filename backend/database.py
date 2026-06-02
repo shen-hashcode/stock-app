@@ -20,9 +20,9 @@
 # 第一部分：导入依赖
 # ============================================================
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -107,9 +107,6 @@ class User(Base):
     
     # 账号状态，默认启用
     is_active = Column(Boolean, default=True)
-    
-    # ORM关系：一个用户有多个策略
-    strategies = relationship("Strategy", back_populates="user")
 
 
 # ============================================================
@@ -147,8 +144,8 @@ class Strategy(Base):
     # 主键ID
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # 外键：关联用户表
-    user_id = Column(Integer, ForeignKey("users.id"))
+    # 用户ID
+    user_id = Column(Integer, index=True)
     
     # 策略名称
     name = Column(String(100))
@@ -172,12 +169,6 @@ class Strategy(Base):
     
     # 更新时间（自动更新）
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    
-    # ORM关系：所属用户
-    user = relationship("User", back_populates="strategies")
-    
-    # ORM关系：执行结果列表
-    results = relationship("StrategyResult", back_populates="strategy")
 
 
 # ============================================================
@@ -220,8 +211,8 @@ class StrategyResult(Base):
     # 主键ID
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # 外键：关联策略表
-    strategy_id = Column(Integer, ForeignKey("strategies.id"))
+    # 策略ID
+    strategy_id = Column(Integer, index=True)
     
     # 执行日期（字符串格式，如 "2024-01-15"）
     run_date = Column(String(20))
@@ -231,9 +222,6 @@ class StrategyResult(Base):
     
     # 记录创建时间
     created_at = Column(DateTime, default=datetime.now)
-    
-    # ORM关系：所属策略
-    strategy = relationship("Strategy", back_populates="results")
 
 
 # ============================================================
