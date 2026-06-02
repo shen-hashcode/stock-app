@@ -25,9 +25,13 @@ import requests  # HTTP请求库
 import time  # 时间控制（请求间隔）
 import json  # JSON解析
 import re  # 正则表达式
+import os  # 环境变量
 from concurrent.futures import ThreadPoolExecutor, as_completed  # 多线程并发
 from typing import List, Dict, Optional  # 类型注解
 import logging  # 日志记录
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 创建日志记录器
 logger = logging.getLogger(__name__)
@@ -483,7 +487,7 @@ def run_strategy(strategy_func, stock_list=None, max_workers=10):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         futures = {executor.submit(process_stock, s): s for s in stock_list}
-        
+
         # 等待所有任务完成，收集结果
         for future in as_completed(futures):
             result = future.result()
@@ -491,3 +495,63 @@ def run_strategy(strategy_func, stock_list=None, max_workers=10):
                 results.append(result)
 
     return results
+
+
+# ============================================================
+# 第七部分：AI策略生成
+# ============================================================
+
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_API_URL = os.getenv("LLM_API_URL", "https://api.deepseek.com/v1/chat/completions")
+LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
+
+STRATEGY_PROMPT = """你是一个Python量化选股脚本生成器。用户会描述选股条件，你需要生成一个Python函数。
+
+要求：
+1. 函数名必须为 check_stock(stock_info)
+2. stock_info 是一个字典，包含: code(股票代码), name(名称), market(市场sh/sz), market_cap(市值,亿)
+3. 可以调用以下已导入的函数:
+   - get_kline_data(code, market, days=10): 返回K线列表，每项为dict含 day,open,close,high,low,volume
+   - get_realtime_quote(code, market): 返回dict含 price,change_pct,volume,open,high,low,market_cap
+4. 函数返回 True 表示符合条件，False 表示不符合
+5. 只输出纯Python代码，不要markdown标记，不要解释
+
+用户条件：{description}
+"""
+
+
+async def generate_strategy_script(description: str) -> str:
+    """调用LLM生成策略脚本"""
+    if not LLM_API_KEY:
+        raise ValueError("未配置LLM_API_KEY环境变量，无法生成AI策略")
+
+    headers = {
+        "Authorization": f"Bearer {LLM_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": LLM_MODEL,
+        "messages": [
+            {"role": "system", "content": "你是一个专业的Python量化选股脚本生成器，只输出代码。"},
+            {"role": "user", "content": STRATEGY_PROMPT.format(description=description)}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 2000
+    }
+
+    resp = requests.post(LLM_API_URL, json=payload, headers=headers, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    content = data["choices"][0]["message"]["content"]
+    # 去除可能的markdown代码块标记
+    content = re.sub(r'^```python\s*\n?', '', content.strip())
+    content = re.sub(r'\n?```\s*$', '', content.strip())
+    return content
+
+
+def extract_strategy_name(name: str) -> str:
+    """提取/清理策略名称"""
+    if not name or not name.strip():
+        return "自定义策略"
+    return name.strip()[:50]
