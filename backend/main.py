@@ -15,8 +15,9 @@
 # 第一部分：导入依赖
 # ============================================================
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -24,7 +25,10 @@ from contextlib import asynccontextmanager
 import json
 import asyncio
 import bcrypt
+import time
 from datetime import datetime
+
+from logger import logger
 
 # 导入本地模块
 from database import init_db, get_db, User, Strategy, StrategyResult  # 数据库模型和工具
@@ -66,6 +70,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        body = b""
+        if request.method in ("POST", "PUT", "PATCH"):
+            body = await request.body()
+
+        logger.info(f">>> {request.method} {request.url.path} query={dict(request.query_params)} body={body.decode('utf-8', errors='replace')[:2000]}")
+
+        response = await call_next(request)
+        duration = round((time.time() - start) * 1000, 1)
+        logger.info(f"<<< {request.method} {request.url.path} status={response.status_code} {duration}ms")
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # 初始化数据库，创建所有表结构
 init_db()

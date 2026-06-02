@@ -1,6 +1,6 @@
 App({
   globalData: {
-    baseUrl: 'http://localhost:8000',
+    baseUrl: 'http://121.40.124.210:8000',
     userInfo: null,
     userId: null,
     userPhone: null,

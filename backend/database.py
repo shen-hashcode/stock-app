@@ -25,10 +25,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
+import logging
 from dotenv import load_dotenv
 
 # 加载.env环境变量文件
 load_dotenv()
+
+# 导入logger使SQL日志输出到文件
+from logger import sql_logger  # noqa: F401
 
 
 # ============================================================
@@ -51,7 +55,7 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     pool_recycle=3600,
-    echo=False
+    echo=True
 )
 
 # 创建会话工厂
