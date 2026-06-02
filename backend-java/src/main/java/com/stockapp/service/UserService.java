@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.stockapp.entity.User;
 import com.stockapp.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -25,6 +27,7 @@ public class UserService {
     }
 
     public User createByOpenid(String openid, String nickname, String phone) {
+        log.info("创建用户, openid={}, nickname={}", openid, nickname);
         User user = new User();
         user.setOpenid(openid);
         user.setNickname(nickname != null ? nickname : "");
@@ -32,10 +35,12 @@ public class UserService {
         user.setCreatedAt(LocalDateTime.now());
         user.setIsActive(true);
         userMapper.insert(user);
+        log.info("用户创建完成, id={}", user.getId());
         return user;
     }
 
     public User register(String phone, String password, String nickname) {
+        log.info("用户注册, phone={}", phone);
         String hash = passwordEncoder.encode(password);
         User user = new User();
         user.setOpenid("phone_" + phone);
@@ -45,6 +50,7 @@ public class UserService {
         user.setCreatedAt(LocalDateTime.now());
         user.setIsActive(true);
         userMapper.insert(user);
+        log.info("用户注册完成, id={}, phone={}", user.getId(), user.getPhone());
         return user;
     }
 

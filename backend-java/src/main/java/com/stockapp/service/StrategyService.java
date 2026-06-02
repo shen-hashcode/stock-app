@@ -78,13 +78,21 @@ public class StrategyService {
      */
     public Map<String, Object> runBuiltinStrategy(String strategyKey, Map<String, Object> customParams, int stockLimit) {
         BuiltinStrategy builtinStrategy = builtinStrategyMap.get(strategyKey);
-        if (builtinStrategy == null) return null;
+        if (builtinStrategy == null) {
+            log.warn("内置策略不存在: {}", strategyKey);
+            return null;
+        }
 
         Map<String, Object> params = new HashMap<>(builtinStrategy.getDefaultParams());
         if (customParams != null) params.putAll(customParams);
 
-        List<Map<String, Object>> stockList = stockService.getStockListQuick(stockLimit > 0 ? stockLimit : 200);
+        int limit = stockLimit > 0 ? stockLimit : 200;
+        log.info("开始执行内置策略: {}, 股票池大小: {}", strategyKey, limit);
+        List<Map<String, Object>> stockList = stockService.getStockListQuick(limit);
+        log.info("获取股票列表完成, 实际数量: {}", stockList.size());
+
         List<Map<String, Object>> results = runConcurrent(stockList, builtinStrategy, params);
+        log.info("内置策略 {} 执行完成, 命中 {} 只股票", strategyKey, results.size());
 
         Map<String, Object> data = new HashMap<>();
         data.put("count", results.size());
@@ -97,25 +105,33 @@ public class StrategyService {
      * 根据策略ID执行
      */
     public Map<String, Object> runStrategyById(Integer strategyId) throws Exception {
+        log.info("开始执行策略, strategyId={}", strategyId);
         Strategy strategy = strategyMapper.selectById(strategyId);
-        if (strategy == null) throw new RuntimeException("策略不存在");
+        if (strategy == null) {
+            log.warn("策略不存在, strategyId={}", strategyId);
+            throw new RuntimeException("策略不存在");
+        }
 
         com.alibaba.fastjson2.JSONObject conditions = com.alibaba.fastjson2.JSON.parseObject(
                 strategy.getConditions() != null ? strategy.getConditions() : "{}");
         String type = conditions.getString("type");
+        log.info("策略类型: {}, 策略名称: {}", type, strategy.getName());
 
         List<Map<String, Object>> stockList = stockService.getStockListQuick(200);
         List<Map<String, Object>> results;
 
         if ("custom".equals(type) && strategy.getScriptCode() != null) {
+            log.info("执行自定义Python脚本策略, 股票池大小: {}", stockList.size());
             results = runCustomStrategy(strategy.getScriptCode(), stockList);
         } else if (builtinStrategyMap.containsKey(type)) {
             BuiltinStrategy builtin = builtinStrategyMap.get(type);
             Map<String, Object> params = new HashMap<>(builtin.getDefaultParams());
             com.alibaba.fastjson2.JSONObject userParams = conditions.getJSONObject("params");
             if (userParams != null) params.putAll(userParams);
+            log.info("执行内置策略: {}, 股票池大小: {}", type, stockList.size());
             results = runConcurrent(stockList, builtin, params);
         } else {
+            log.error("未知策略类型: {}, strategyId={}", type, strategyId);
             throw new RuntimeException("未知策略类型");
         }
 
@@ -127,6 +143,8 @@ public class StrategyService {
         record.setStocksJson(com.alibaba.fastjson2.JSON.toJSONString(results));
         record.setCreatedAt(LocalDateTime.now());
         resultMapper.insert(record);
+
+        log.info("策略执行结果已保存, strategyId={}, 命中{}只股票", strategyId, results.size());
 
         Map<String, Object> data = new HashMap<>();
         data.put("count", results.size());
@@ -141,6 +159,7 @@ public class StrategyService {
         List<Map<String, Object>> results = Collections.synchronizedList(new ArrayList<>());
         ExecutorService executor = Executors.newFixedThreadPool(10);
         List<Future<?>> futures = new ArrayList<>();
+        long start = System.currentTimeMillis();
 
         for (Map<String, Object> stock : stockList) {
             futures.add(executor.submit(() -> {
@@ -152,14 +171,23 @@ public class StrategyService {
                         result.put("quote", quote);
                         results.add(result);
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    log.debug("策略检查异常, stock={}, error={}", stock.get("code"), e.getMessage());
+                }
             }));
         }
 
+        int timeoutCount = 0;
         for (Future<?> f : futures) {
-            try { f.get(120, TimeUnit.SECONDS); } catch (Exception ignored) {}
+            try { f.get(120, TimeUnit.SECONDS); } catch (Exception e) { timeoutCount++; }
         }
         executor.shutdown();
+
+        if (timeoutCount > 0) {
+            log.warn("并发执行中有 {} 个任务超时或异常", timeoutCount);
+        }
+        log.debug("并发策略执行完成, 总耗时{}ms, 检查{}只, 命中{}只",
+                System.currentTimeMillis() - start, stockList.size(), results.size());
         return results;
     }
 
@@ -168,7 +196,10 @@ public class StrategyService {
      */
     private List<Map<String, Object>> runCustomStrategy(String scriptCode, List<Map<String, Object>> stockList) {
         List<Map<String, Object>> results = new ArrayList<>();
-        // 自定义策略通过Python子进程执行
+        int errorCount = 0;
+        int timeoutCount = 0;
+        long start = System.currentTimeMillis();
+
         for (Map<String, Object> stock : stockList) {
             try {
                 String code = (String) stock.get("code");
@@ -183,7 +214,12 @@ public class StrategyService {
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
                 boolean finished = process.waitFor(10, TimeUnit.SECONDS);
-                if (finished && process.exitValue() == 0) {
+                if (!finished) {
+                    timeoutCount++;
+                    process.destroyForcibly();
+                    continue;
+                }
+                if (process.exitValue() == 0) {
                     String output = new String(process.getInputStream().readAllBytes()).trim();
                     if ("true".equalsIgnoreCase(output)) {
                         Map<String, Object> quote = stockService.getRealtimeQuote(code, market);
@@ -191,9 +227,17 @@ public class StrategyService {
                         result.put("quote", quote);
                         results.add(result);
                     }
+                } else {
+                    errorCount++;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                errorCount++;
+                log.debug("自定义策略执行异常, stock={}, error={}", stock.get("code"), e.getMessage());
+            }
         }
+
+        log.info("自定义策略执行完成, 总耗时{}ms, 检查{}只, 命中{}只, 错误{}, 超时{}",
+                System.currentTimeMillis() - start, stockList.size(), results.size(), errorCount, timeoutCount);
         return results;
     }
 
