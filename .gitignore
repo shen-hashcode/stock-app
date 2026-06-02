@@ -39,6 +39,9 @@ npm-debug.log*
 # WeChat miniapp
 miniapp/node_modules/
 
+# Java
+target/
+
 # Distribution
 dist/
 build/
