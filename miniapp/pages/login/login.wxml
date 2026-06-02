@@ -1,0 +1,66 @@
+<view class="login-page">
+  <!-- 背景发光装饰 -->
+  <view class="bg-glow bg-glow-1"></view>
+  <view class="bg-glow bg-glow-2"></view>
+  <view class="bg-glow bg-glow-3"></view>
+
+  <!-- Logo区域 -->
+  <view class="logo-area">
+    <view class="logo-ring"></view>
+    <view class="logo-text">智能选股</view>
+    <view class="logo-subtitle">AI驱动 · 量化交易助手</view>
+  </view>
+
+  <!-- 登录卡片 -->
+  <view class="login-card">
+    <!-- 模式切换 -->
+    <view class="mode-toggle">
+      <view class="mode-btn {{mode === 'login' ? 'active' : ''}}" bindtap="switchMode" data-mode="login">登录</view>
+      <view class="mode-btn {{mode === 'register' ? 'active' : ''}}" bindtap="switchMode" data-mode="register">注册</view>
+      <view class="mode-indicator {{mode === 'register' ? 'right' : ''}}"></view>
+    </view>
+
+    <!-- 表单区 -->
+    <view class="form-area">
+      <view class="input-wrapper">
+        <view class="input-icon-box">
+          <text class="input-icon-text">☎</text>
+        </view>
+        <input class="login-input" type="number" maxlength="11"
+               placeholder="请输入手机号" placeholder-style="color:#4a5568"
+               bindinput="onPhoneInput" value="{{phone}}" />
+      </view>
+
+      <view class="input-wrapper">
+        <view class="input-icon-box">
+          <text class="input-icon-text">⚿</text>
+        </view>
+        <input class="login-input" type="text" password
+               placeholder="请输入密码（至少6位）" placeholder-style="color:#4a5568"
+               bindinput="onPasswordInput" value="{{password}}" />
+      </view>
+
+      <view class="input-wrapper" wx:if="{{mode === 'register'}}">
+        <view class="input-icon-box">
+          <text class="input-icon-text">♦</text>
+        </view>
+        <input class="login-input" type="text" maxlength="20"
+               placeholder="请输入昵称（选填）" placeholder-style="color:#4a5568"
+               bindinput="onNicknameInput" value="{{nickname}}" />
+      </view>
+    </view>
+
+    <!-- 提交按钮 -->
+    <view class="submit-btn {{loading ? 'disabled' : ''}}" bindtap="handleSubmit">
+      <text class="btn-text">{{mode === 'login' ? '登 录' : '注 册'}}</text>
+    </view>
+
+    <!-- 底部切换提示 -->
+    <view class="switch-hint">
+      <text class="hint-text">{{mode === 'login' ? '还没有账号？' : '已有账号？'}}</text>
+      <text class="hint-link" bindtap="switchMode" data-mode="{{mode === 'login' ? 'register' : 'login'}}">
+        {{mode === 'login' ? '立即注册' : '去登录'}}
+      </text>
+    </view>
+  </view>
+</view>

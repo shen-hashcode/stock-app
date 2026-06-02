@@ -1,0 +1,61 @@
+<view class="container">
+  <!-- 股票信息卡片 -->
+  <view class="stock-card" wx:if="{{stockInfo}}">
+    <!-- 价格区 -->
+    <view class="price-section">
+      <view class="stock-header">
+        <view class="stock-name">{{stockInfo.name}}</view>
+        <view class="stock-code">{{stockInfo.code}}</view>
+      </view>
+      <view class="price-display">
+        <view class="current-price {{stockInfo.change_pct > 0 ? 'up' : 'down'}}">
+          {{stockInfo.price || '--'}}
+        </view>
+        <view class="change-badge {{stockInfo.change_pct > 0 ? 'up' : 'down'}}">
+          {{stockInfo.change_pct > 0 ? '+' : ''}}{{stockInfo.change_pct || '--'}}%
+        </view>
+      </view>
+      <view class="price-glow {{stockInfo.change_pct > 0 ? 'glow-up' : 'glow-down'}}"></view>
+    </view>
+
+    <!-- 数据网格 -->
+    <view class="data-grid">
+      <view class="grid-item">
+        <view class="grid-label">开盘价</view>
+        <view class="grid-value">{{stockInfo.open || '--'}}</view>
+      </view>
+      <view class="grid-item">
+        <view class="grid-label">最高价</view>
+        <view class="grid-value up">{{stockInfo.high || '--'}}</view>
+      </view>
+      <view class="grid-item">
+        <view class="grid-label">最低价</view>
+        <view class="grid-value down">{{stockInfo.low || '--'}}</view>
+      </view>
+      <view class="grid-item">
+        <view class="grid-label">成交量</view>
+        <view class="grid-value">{{stockInfo.volume || '--'}}</view>
+      </view>
+      <view class="grid-item span-2">
+        <view class="grid-label">总市值</view>
+        <view class="grid-value highlight">{{stockInfo.market_cap || '--'}}亿</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-state" wx:if="{{loading}}">
+    <view class="loading-dots">
+      <view class="dot"></view>
+      <view class="dot"></view>
+      <view class="dot"></view>
+    </view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && !stockInfo}}">
+    <view class="empty-icon">◇</view>
+    <text class="empty-text">暂无股票信息</text>
+  </view>
+</view>
