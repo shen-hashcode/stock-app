@@ -1,19 +1,31 @@
-<!--pages/result/result.wxml-->
 <view class="container">
-  <view class="card">
-    <view class="card-title">历史记录</view>
+  <!-- 顶部筛选区 -->
+  <view class="filter-card">
+    <view class="filter-title">
+      <text class="filter-icon">◉</text>
+      <text>历史记录</text>
+    </view>
     <view class="date-selector">
       <picker mode="date" bindchange="onDateChange" value="{{selectedDate}}">
-        <view class="date-text">{{selectedDate || '选择日期'}}</view>
+        <view class="date-btn">
+          <text class="date-icon">▣</text>
+          <text class="date-text">{{selectedDate || '选择日期'}}</text>
+        </view>
       </picker>
     </view>
   </view>
 
+  <!-- 结果列表 -->
   <view class="result-list">
     <view class="result-card" wx:for="{{results}}" wx:key="id">
       <view class="result-header">
-        <view class="result-date">{{item.run_date}}</view>
-        <view class="result-count">{{item.stocks.length}} 只</view>
+        <view class="result-date">
+          <text class="date-dot"></text>
+          {{item.run_date}}
+        </view>
+        <view class="result-count">
+          <text class="count-number">{{item.stocks.length}}</text> 只
+        </view>
       </view>
       <view class="stock-list">
         <view class="stock-item" wx:for="{{item.stocks}}" wx:for-item="stock" wx:key="code" bindtap="goStockDetail" data-code="{{stock.code}}" data-market="{{stock.market}}">
@@ -21,7 +33,7 @@
             <view class="stock-name">{{stock.name}}</view>
             <view class="stock-code">{{stock.code}}</view>
           </view>
-          <view class="stock-price">
+          <view class="stock-data">
             <view class="stock-change {{stock.change_pct > 0 ? 'up' : 'down'}}">
               {{stock.change_pct || '--'}}%
             </view>
@@ -32,7 +44,10 @@
     </view>
   </view>
 
-  <view class="empty" wx:if="{{results.length === 0}}">
-    <text>暂无筛选结果</text>
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{results.length === 0}}">
+    <view class="empty-icon">◇</view>
+    <text class="empty-text">暂无筛选结果</text>
+    <text class="empty-hint">策略执行后将在此显示历史记录</text>
   </view>
 </view>

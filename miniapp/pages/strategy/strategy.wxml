@@ -1,26 +1,42 @@
-<!--pages/strategy/strategy.wxml-->
 <view class="container">
-  <view class="card">
-    <view class="card-title">我的策略</view>
-    <view class="btn-primary" bindtap="goCreate">+ 创建新策略</view>
+  <!-- 顶部操作区 -->
+  <view class="header-card">
+    <view class="header-title">
+      <text class="header-icon">◈</text>
+      <text>我的策略</text>
+    </view>
+    <view class="header-count" wx:if="{{strategies.length > 0}}">{{strategies.length}}个策略运行中</view>
+    <view class="btn-create" bindtap="goCreate">
+      <text class="btn-create-icon">+</text> 创建新策略
+    </view>
   </view>
 
+  <!-- 策略列表 -->
   <view class="strategy-list">
     <view class="strategy-card" wx:for="{{strategies}}" wx:key="id">
+      <view class="card-glow"></view>
       <view class="strategy-header">
         <view class="strategy-name">{{item.name}}</view>
-        <switch checked="{{item.is_active}}" bindchange="toggleStrategy" data-id="{{item.id}}" />
+        <switch checked="{{item.is_active}}" bindchange="toggleStrategy" data-id="{{item.id}}" color="#00d4ff" />
       </view>
       <view class="strategy-desc">{{item.description}}</view>
+      <view class="glow-divider"></view>
       <view class="strategy-actions">
-        <view class="btn-run" bindtap="runStrategy" data-id="{{item.id}}">立即执行</view>
-        <view class="btn-result" bindtap="viewResult" data-id="{{item.id}}">查看结果</view>
+        <view class="btn-run" bindtap="runStrategy" data-id="{{item.id}}">
+          <text class="action-icon">▶</text> 立即执行
+        </view>
+        <view class="btn-result" bindtap="viewResult" data-id="{{item.id}}">
+          <text class="action-icon">◉</text> 查看结果
+        </view>
       </view>
     </view>
   </view>
 
-  <view class="empty" wx:if="{{strategies.length === 0}}">
-    <text>暂无策略，快去创建吧</text>
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{strategies.length === 0}}">
+    <view class="empty-icon">◇</view>
+    <text class="empty-text">暂无策略</text>
+    <text class="empty-hint">前往首页创建你的第一个AI策略</text>
   </view>
 </view>
 
@@ -28,11 +44,15 @@
 <view class="modal" wx:if="{{showResult}}">
   <view class="modal-mask" bindtap="closeModal"></view>
   <view class="modal-content">
+    <view class="modal-decoration"></view>
     <view class="modal-title">筛选结果</view>
-    <view class="result-count">找到 {{resultCount}} 只符合条件的股票</view>
+    <view class="result-summary">
+      <text class="result-number">{{resultCount}}</text>
+      <text class="result-label">只符合条件的股票</text>
+    </view>
     <scroll-view scroll-y class="result-list">
       <view class="stock-item" wx:for="{{resultStocks}}" wx:key="code">
-        <view>
+        <view class="stock-info">
           <view class="stock-name">{{item.name}}</view>
           <view class="stock-code">{{item.code}}</view>
         </view>

@@ -1,27 +1,72 @@
+/* 结果页 - 暗黑科技风 */
+page {
+  background-color: #0d1117;
+}
+
+/* 顶部筛选区 */
+.filter-card {
+  background: linear-gradient(135deg, rgba(22, 33, 62, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1rpx solid rgba(0, 212, 255, 0.15);
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+}
+
+.filter-icon {
+  color: #7c3aed;
+  margin-right: 12rpx;
+  font-size: 28rpx;
+}
+
 .date-selector {
   display: flex;
-  justify-content: center;
-  margin-top: 20rpx;
+  align-items: center;
+}
+
+.date-btn {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1rpx solid rgba(0, 212, 255, 0.2);
+  padding: 14rpx 24rpx;
+  border-radius: 10rpx;
+}
+
+.date-icon {
+  color: #00d4ff;
+  margin-right: 10rpx;
+  font-size: 24rpx;
 }
 
 .date-text {
-  background: #f0f0f0;
-  padding: 16rpx 40rpx;
-  border-radius: 8rpx;
-  font-size: 28rpx;
-  color: #333;
+  font-size: 26rpx;
+  color: #e2e8f0;
+  font-family: 'SF Mono', monospace;
 }
 
+/* 结果卡片 */
 .result-list {
-  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
 }
 
 .result-card {
-  background: #fff;
-  border-radius: 16rpx;
-  margin-bottom: 20rpx;
+  background: linear-gradient(135deg, rgba(22, 33, 62, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border: 1rpx solid rgba(0, 212, 255, 0.08);
+  border-radius: 20rpx;
   overflow: hidden;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
 }
 
 .result-header {
@@ -29,74 +74,126 @@
   justify-content: space-between;
   align-items: center;
   padding: 24rpx 30rpx;
-  background: #f8f9fa;
-  border-bottom: 1rpx solid #eee;
+  border-bottom: 1rpx solid rgba(0, 212, 255, 0.06);
+  background: rgba(0, 212, 255, 0.03);
 }
 
 .result-date {
   font-size: 28rpx;
-  color: #333;
-  font-weight: bold;
+  color: #e2e8f0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  font-family: 'SF Mono', monospace;
+}
+
+.date-dot {
+  display: inline-block;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #00d4ff;
+  margin-right: 14rpx;
+  box-shadow: 0 0 8rpx rgba(0, 212, 255, 0.5);
 }
 
 .result-count {
   font-size: 24rpx;
-  color: #1a73e8;
+  color: #8b95a5;
 }
 
+.count-number {
+  color: #00d4ff;
+  font-weight: 700;
+  font-family: 'SF Mono', monospace;
+}
+
+/* 股票列表 */
 .stock-list {
-  padding: 10rpx 0;
+  padding: 4rpx 0;
 }
 
 .stock-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20rpx 30rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  padding: 22rpx 30rpx;
+  border-bottom: 1rpx solid rgba(0, 212, 255, 0.04);
 }
 
 .stock-item:last-child {
   border-bottom: none;
 }
 
+.stock-item:active {
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.stock-info {
+  flex: 1;
+}
+
 .stock-name {
   font-size: 30rpx;
-  color: #333;
+  color: #e2e8f0;
+  font-weight: 500;
 }
 
 .stock-code {
   font-size: 24rpx;
-  color: #999;
+  color: #8b95a5;
   margin-top: 4rpx;
+  font-family: 'SF Mono', monospace;
 }
 
-.stock-price {
+.stock-data {
   text-align: right;
 }
 
 .stock-change {
   font-size: 30rpx;
-  font-weight: bold;
+  font-weight: 700;
+  font-family: 'SF Mono', monospace;
 }
 
 .stock-change.up {
-  color: #e74c3c;
+  color: #ff4d4f;
+  text-shadow: 0 0 8rpx rgba(255, 77, 79, 0.3);
 }
 
 .stock-change.down {
-  color: #27ae60;
+  color: #00b96b;
+  text-shadow: 0 0 8rpx rgba(0, 185, 107, 0.3);
 }
 
 .stock-market-cap {
   font-size: 22rpx;
-  color: #999;
-  margin-top: 4rpx;
+  color: #8b95a5;
+  margin-top: 6rpx;
+  font-family: 'SF Mono', monospace;
 }
 
-.empty {
-  text-align: center;
-  padding: 100rpx 0;
-  color: #999;
-  font-size: 28rpx;
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 140rpx 0;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  color: rgba(124, 58, 237, 0.3);
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #8b95a5;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  font-size: 24rpx;
+  color: #4a5568;
 }

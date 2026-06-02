@@ -1,4 +1,4 @@
-const app = getApp()
+const { get } = require('../../utils/request')
 
 Page({
   data: {
@@ -17,24 +17,19 @@ Page({
   loadResults() {
     const { strategyId } = this.data
     if (!strategyId) return
-
-    wx.request({
-      url: `${app.globalData.baseUrl}/api/results/${strategyId}`,
-      success: (res) => {
-        if (res.data.code === 0) {
-          const results = res.data.data.map(item => ({
-            ...item,
-            stocks: JSON.parse(item.stocks_json || '[]')
-          }))
-          this.setData({ results })
-        }
+    get(`/api/results/${strategyId}`).then(res => {
+      if (res.code === 0) {
+        const results = res.data.map(item => ({
+          ...item,
+          stocks: JSON.parse(item.stocks_json || '[]')
+        }))
+        this.setData({ results })
       }
     })
   },
 
   onDateChange(e) {
     this.setData({ selectedDate: e.detail.value })
-    // TODO: 按日期筛选
   },
 
   goStockDetail(e) {

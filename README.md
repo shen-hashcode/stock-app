@@ -1,31 +1,36 @@
-# 智能选股助手 - 微信小程序
+# 智能选股助手
+
+基于微信小程序 + FastAPI的智能选股系统，支持内置策略和AI自定义策略。
 
 ## 项目结构
 
 ```
 stock_app/
-├── backend/                 # 后端服务
-│   ├── main.py             # FastAPI主应用
-│   ├── database.py         # 数据库模型
-│   ├── stock_service.py    # 股票数据服务
-│   ├── scheduler.py        # 定时任务
-│   ├── .env                # 配置文件
-│   ├── requirements.txt    # Python依赖
-│   └── strategies/         # 策略目录
-│       └── builtin.py      # 内置策略
-└── miniapp/                # 微信小程序
-    ├── app.js
-    ├── app.json
-    ├── app.wxss
+├── backend/                      # FastAPI后端
+│   ├── main.py                   # 主应用（API接口）
+│   ├── database.py               # 数据库模型
+│   ├── stock_service.py          # 股票数据服务
+│   ├── scheduler.py              # 定时任务
+│   ├── run_steady_rise.py        # 策略运行脚本
+│   ├── .env                      # 环境配置
+│   ├── requirements.txt          # Python依赖
+│   └── strategies/               # 策略模块
+│       ├── builtin.py            # 5个内置策略
+│       └── steady_rise.py        # 稳步上涨策略
+│
+└── miniapp/                      # 微信小程序
+    ├── app.js                    # 应用入口
+    ├── app.json                  # 应用配置
+    ├── app.wxss                  # 全局样式
     └── pages/
-        ├── index/          # 首页
-        ├── strategy/       # 策略管理
-        └── result/         # 结果查看
+        ├── index/                # 首页（策略展示+AI创建）
+        ├── strategy/             # 策略管理（执行+查看）
+        └── result/               # 结果查看（历史记录）
 ```
 
 ## 快速开始
 
-### 1. 后端部署
+### 后端部署
 
 ```bash
 cd backend
@@ -33,423 +38,130 @@ cd backend
 # 安装依赖
 pip install -r requirements.txt
 
-# 配置环境变量
-# 编辑 .env 文件，填入：
-# - 微信小程序 appid/secret
-# - 大模型API key (DeepSeek/ChatGPT等)
-# - MySQL数据库连接信息
-
-# 初始化数据库（首次运行）
-mysql -u root -p < init.sql
+# 配置环境变量（编辑 .env 文件）
+# DATABASE_URL=sqlite:///./test.db
+# SCHEDULE_HOUR=16
+# SCHEDULE_MINUTE=0
 
 # 启动服务
 python main.py
 ```
 
-服务将在 http://localhost:8000 启动
+服务启动于 http://localhost:8000
 
-### 2. 微信小程序配置
+### 小程序配置
 
-1. 打开微信开发者工具
-2. 导入 `miniapp` 目录
-3. 修改 `app.js` 中的 `baseUrl` 为你的后端地址
-4. 配置小程序 appid
+1. 微信开发者工具导入 `miniapp` 目录
+2. 修改 `app.js` 中的 `baseUrl` 为后端地址
+3. 配置小程序 appid
 
 ## 功能特性
 
-### 1. 智能选股系统
+### 内置策略
 
-#### 1.1 内置策略引擎
-系统提供5种经过验证的经典选股策略：
+| 策略 | 逻辑 | 默认参数 |
+|------|------|----------|
+| 涨幅回调 | 前N日累计涨幅超阈值，当日回调 | 3天/13%/50亿 |
+| 放量突破 | 成交量放大且价格上涨 | 20天/2倍/50亿 |
+| 均线金叉 | 短期均线上穿长期均线 | 5日/20日/50亿 |
+| 连续上涨 | 连续N天收阳线 | 3天/50亿 |
+| 涨停开板 | 昨日涨停，今日开板 | 50亿 |
+| 稳步上涨 | 每日涨幅在0%~3%之间 | 6天/50亿 |
 
-| 策略名称 | 策略逻辑 | 核心参数 | 适用场景 |
-|----------|----------|----------|----------|
-| **涨幅回调** | 前N日累计涨幅超过阈值，当日出现回调 | 上涨天数(3天)、涨幅阈值(13%)、最低市值(50亿) | 捕捉强势股回调买入机会 |
-| **放量突破** | 成交量突然放大，且价格上涨 | 均量天数(20天)、量比阈值(2.0)、最低市值(50亿) | 识别主力资金介入信号 |
-| **均线金叉** | 短期均线上穿长期均线 | 短期均线(5日)、长期均线(20日)、最低市值(50亿) | 趋势转折点判断 |
-| **连续上涨** | 连续N天收阳线 | 连续天数(3天)、最低市值(50亿) | 发现持续上涨动能 |
-| **涨停开板** | 昨日涨停，今日开板低开 | 最低市值(50亿) | 捕捉涨停后二次机会 |
+### AI自定义策略
 
-**策略特点：**
-- 所有策略均支持参数自定义调整
-- 自动过滤ST股、退市股和北交所股票
-- 内置市值筛选，避免小盘股风险
-- 支持多线程并发执行，提升筛选效率
+用自然语言描述选股条件，AI自动生成Python脚本：
 
-#### 1.2 AI自定义策略
-基于大语言模型的智能策略生成系统：
-
-**工作流程：**
-1. **自然语言输入**：用户用日常语言描述选股条件
-2. **AI代码生成**：调用DeepSeek/ChatGPT等大模型API生成Python脚本
-3. **安全执行**：在隔离环境中执行生成的策略代码
-4. **结果筛选**：自动筛选符合条件的股票
-
-**示例描述：**
 ```
-前3天累计涨幅超过15%，第4天回调，市值大于50亿
-MACD金叉，成交量放大2倍以上
-突破20日均线，RSI小于30
-连续5天放量上涨，换手率超过5%
+前3天累计涨幅超过15%，第4天回调，市值大于100亿
 ```
 
-**技术优势：**
-- 支持复杂技术指标组合
-- 自动处理数据获取和计算
-- 生成的代码可复用和修改
-- 支持历史数据回测验证
+### 定时任务
 
-### 2. 数据服务系统
+- 每天16:00自动执行所有活跃策略
+- 可通过 `.env` 配置执行时间
 
-#### 2.1 实时行情数据
-- **数据源**：腾讯财经API，稳定可靠
-- **更新频率**：实时更新
-- **数据内容**：
-  - 股票基本信息（代码、名称、市场）
-  - 实时价格（现价、涨跌幅）
-  - 交易数据（成交量、换手率）
-  - 财务数据（总市值、流通市值）
+## API接口
 
-#### 2.2 历史K线数据
-- **数据范围**：支持任意天数历史数据
-- **数据格式**：包含开盘价、收盘价、最高价、最低价、成交量
-- **数据处理**：自动前复权处理，保证技术分析准确性
-- **缓存机制**：本地缓存减少API调用，提升响应速度
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/users` | POST | 创建/获取用户 |
+| `/api/strategies/builtin` | GET | 获取内置策略列表 |
+| `/api/strategies` | POST | 创建策略 |
+| `/api/strategies/custom` | POST | AI生成策略 |
+| `/api/strategies/{user_id}` | GET | 获取用户策略 |
+| `/api/strategies/{id}/run` | POST | 执行策略 |
+| `/api/strategies/builtin/{key}/run` | POST | 直接运行内置策略 |
+| `/api/results/{id}` | GET | 获取执行结果 |
+| `/api/stock/{code}` | GET | 获取股票详情 |
 
-#### 2.3 股票池管理
-- **覆盖范围**：沪深两市全部A股（不含北交所）
-- **自动筛选**：过滤ST股、退市风险股
-- **市值分类**：按总市值自动分类，支持市值条件筛选
-- **实时更新**：每日自动更新股票池信息
+## 技术栈
 
-### 3. 微信小程序前端
+| 层级 | 技术 |
+|------|------|
+| 前端 | 微信小程序原生框架 |
+| 后端 | FastAPI + SQLAlchemy |
+| 数据库 | SQLite/MySQL |
+| 定时任务 | APScheduler |
+| 数据源 | 腾讯财经API |
 
-#### 3.1 首页功能
-- **策略展示**：展示所有内置策略及参数说明
-- **快速创建**：支持一键创建自定义策略
-- **热门推荐**：显示最受欢迎的策略组合
-- **状态显示**：实时显示策略执行状态
+## 数据库
 
-#### 3.2 策略管理
-- **策略列表**：查看用户创建的所有策略
-- **状态控制**：启用/禁用策略开关
-- **立即执行**：手动触发策略执行
-- **结果查看**：查看策略筛选结果
+```sql
+-- 用户表
+users (id, openid, nickname, phone, created_at, is_active)
 
-#### 3.3 结果展示
-- **历史记录**：按日期查看历史筛选结果
-- **股票详情**：查看符合条件的股票详细信息
-- **数据可视化**：涨跌幅颜色标识，直观显示
-- **详情跳转**：点击股票查看详细行情
+-- 策略表
+strategies (id, user_id, name, description, conditions, script_code, is_active, created_at, updated_at)
 
-#### 3.4 用户系统
-- **微信登录**：支持微信一键登录
-- **数据同步**：策略和结果云端同步
-- **个性化**：用户独立策略空间
+-- 结果表
+strategy_results (id, strategy_id, run_date, stocks_json, created_at)
+```
 
-### 4. 定时任务系统
+关系：User 1:N Strategy 1:N StrategyResult
 
-#### 4.1 自动执行
-- **执行时间**：默认每天8:30自动执行（可配置）
-- **执行范围**：所有启用状态的策略
-- **执行逻辑**：
-  1. 获取最新股票池数据
-  2. 遍历执行所有活跃策略
-  3. 记录筛选结果到数据库
-  4. 生成执行日志
+## 环境配置
 
-#### 4.2 配置选项
 ```env
-SCHEDULE_HOUR=8          # 执行小时（0-23）
-SCHEDULE_MINUTE=30       # 执行分钟（0-59）
+# 数据库
+DATABASE_URL=sqlite:///./test.db
+
+# 定时任务
+SCHEDULE_HOUR=16
+SCHEDULE_MINUTE=0
+
+# 微信小程序（可选）
+WECHAT_APPID=your_appid
+WECHAT_SECRET=your_secret
+
+# AI接口（可选）
+LLM_API_KEY=your_api_key
+LLM_API_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
 ```
 
-#### 4.3 监控日志
-- **执行状态**：实时监控任务执行状态
-- **错误处理**：异常自动记录，不影响其他策略
-- **性能统计**：记录执行时间和筛选数量
+## 使用示例
 
-### 5. API接口系统
-
-#### 5.1 用户管理接口
-| 接口 | 方法 | 功能 | 参数 |
-|------|------|------|------|
-| `/api/users` | POST | 创建/获取用户 | openid, nickname, phone |
-
-#### 5.2 策略管理接口
-| 接口 | 方法 | 功能 | 参数 |
-|------|------|------|------|
-| `/api/strategies/builtin` | GET | 获取内置策略列表 | 无 |
-| `/api/strategies` | POST | 创建自定义策略 | user_id, name, description, conditions |
-| `/api/strategies/custom` | POST | AI生成策略 | user_id, name, description |
-| `/api/strategies/{user_id}` | GET | 获取用户策略列表 | user_id |
-| `/api/strategies/{id}/run` | POST | 执行指定策略 | strategy_id |
-
-#### 5.3 数据查询接口
-| 接口 | 方法 | 功能 | 参数 |
-|------|------|------|------|
-| `/api/results/{strategy_id}` | GET | 获取策略结果 | strategy_id, limit |
-| `/api/stock/{code}` | GET | 获取股票详情 | code, market |
-
-#### 5.4 接口特点
-- **RESTful设计**：标准REST API设计规范
-- **JSON格式**：统一JSON数据格式
-- **错误处理**：完善的错误码和错误信息
-- **性能优化**：支持分页和限制返回数量
-
-### 6. 技术架构
-
-#### 6.1 后端技术栈
-- **Web框架**：FastAPI（高性能异步框架）
-- **数据库**：MySQL 8.0+
-- **ORM**：SQLAlchemy（数据库映射）
-- **定时任务**：APScheduler（任务调度）
-- **数据请求**：Requests（HTTP客户端）
-- **并发处理**：ThreadPoolExecutor（多线程）
-
-#### 6.2 前端技术栈
-- **框架**：微信小程序原生框架
-- **UI组件**：自定义组件库
-- **状态管理**：全局数据管理
-- **网络请求**：wx.request封装
-
-#### 6.3 数据流架构
-```
-用户操作 → 小程序前端 → API接口 → 业务逻辑 → 数据服务 → 外部API
-    ↓           ↓           ↓           ↓           ↓
-  界面展示    状态管理    路由处理    策略执行    数据获取
-```
-
-#### 6.4 数据库设计
-
-系统采用关系型数据库，包含3个核心表，通过外键建立关联关系。
-
-##### 6.4.1 用户表 (users)
-
-存储用户基本信息，支持微信登录。
-
-| 字段名 | 类型 | 约束 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| id | INTEGER | PRIMARY KEY, INDEX | 自增 | 用户唯一标识 |
-| openid | VARCHAR(100) | UNIQUE, INDEX | - | 微信用户唯一标识 |
-| nickname | VARCHAR(50) | - | 空字符串 | 用户昵称 |
-| phone | VARCHAR(20) | - | 空字符串 | 手机号码 |
-| created_at | DATETIME | - | 当前时间 | 注册时间 |
-| is_active | BOOLEAN | - | True | 账号是否启用 |
-
-**索引设计：**
-- 主键索引：`id`
-- 唯一索引：`openid`（加速微信登录查询）
-
-**关联关系：**
-- 一对多：一个用户可创建多个策略 (`User.strategies`)
-
-##### 6.4.2 策略表 (strategies)
-
-存储用户创建的选股策略，支持内置策略和AI生成的自定义策略。
-
-| 字段名 | 类型 | 约束 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| id | INTEGER | PRIMARY KEY, INDEX | 自增 | 策略唯一标识 |
-| user_id | INTEGER | FOREIGN KEY(users.id) | - | 所属用户ID |
-| name | VARCHAR(100) | - | - | 策略名称 |
-| description | TEXT | - | - | 策略描述 |
-| conditions | TEXT | - | '{}' | 策略条件（JSON格式） |
-| script_code | TEXT | - | NULL | AI生成的Python脚本代码 |
-| is_active | BOOLEAN | - | True | 是否启用 |
-| created_at | DATETIME | - | 当前时间 | 创建时间 |
-| updated_at | DATETIME | - | 当前时间 | 更新时间（自动更新） |
-
-**字段详细说明：**
-
-- **conditions** (JSON格式)：
-  ```json
-  {
-    "type": "rise_pullback",  // 策略类型标识
-    "params": {               // 策略参数
-      "days": 3,
-      "rise_pct": 13,
-      "market_cap_min": 50
-    }
-  }
-  ```
-  
-  对于AI自定义策略：
-  ```json
-  {
-    "type": "custom",
-    "description": "前3天累计涨幅超过15%，第4天回调"
-  }
-  ```
-
-- **script_code**：AI生成的Python脚本，包含 `check_stock(stock_info)` 函数，用于自定义策略执行。
-
-**索引设计：**
-- 主键索引：`id`
-- 外键索引：`user_id`（加速用户策略查询）
-
-**关联关系：**
-- 多对一：多个策略属于一个用户 (`Strategy.user`)
-- 一对多：一个策略可有多次执行结果 (`Strategy.results`)
-
-##### 6.4.3 策略结果表 (strategy_results)
-
-存储策略执行后的筛选结果，支持历史记录查询。
-
-| 字段名 | 类型 | 约束 | 默认值 | 说明 |
-|--------|------|------|--------|------|
-| id | INTEGER | PRIMARY KEY, INDEX | 自增 | 结果唯一标识 |
-| strategy_id | INTEGER | FOREIGN KEY(strategies.id) | - | 所属策略ID |
-| run_date | VARCHAR(20) | - | - | 执行日期（格式：YYYY-MM-DD） |
-| stocks_json | TEXT | - | - | 筛选结果（JSON格式） |
-| created_at | DATETIME | - | 当前时间 | 记录创建时间 |
-
-**字段详细说明：**
-
-- **stocks_json** (JSON格式)：
-  ```json
-  [
-    {
-      "code": "600519",
-      "name": "贵州茅台",
-      "market": "sh",
-      "market_cap": 21000.5,
-      "quote": {
-        "price": 1680.00,
-        "change_pct": 1.25,
-        "volume": 12500000,
-        "market_cap": 21000.5
-      }
-    },
-    {
-      "code": "000858",
-      "name": "五粮液",
-      "market": "sz",
-      "market_cap": 8500.3,
-      "quote": {
-        "price": 165.50,
-        "change_pct": -0.85,
-        "volume": 8500000,
-        "market_cap": 8500.3
-      }
-    }
-  ]
-  ```
-
-**索引设计：**
-- 主键索引：`id`
-- 外键索引：`strategy_id`（加速策略结果查询）
-- 组合索引：`(strategy_id, run_date)`（加速按日期查询策略结果）
-
-**关联关系：**
-- 多对一：多个结果属于一个策略 (`StrategyResult.strategy`)
-
-##### 6.4.4 实体关系图 (ERD)
-
-```
-┌─────────────────┐       ┌─────────────────────┐       ┌─────────────────────┐
-│     users       │       │     strategies       │       │  strategy_results   │
-├─────────────────┤       ├─────────────────────┤       ├─────────────────────┤
-│ id (PK)         │──┐    │ id (PK)             │──┐    │ id (PK)             │
-│ openid (UQ)     │  │    │ user_id (FK)        │  │    │ strategy_id (FK)    │
-│ nickname        │  │    │ name                │  │    │ run_date            │
-│ phone           │  └───>│ description         │  └───>│ stocks_json         │
-│ created_at      │       │ conditions          │       │ created_at          │
-│ is_active       │       │ script_code         │       └─────────────────────┘
-└─────────────────┘       │ is_active           │
-                          │ created_at          │
-                          │ updated_at          │
-                          └─────────────────────┘
-
-关系说明：
-- users.id 1:N strategies.user_id （一个用户有多个策略）
-- strategies.id 1:N strategy_results.strategy_id （一个策略有多个执行结果）
-```
-
-##### 6.4.5 数据库约束与完整性
-
-**外键约束：**
-- `strategies.user_id` → `users.id`（级联删除：删除用户时同步删除其策略）
-- `strategy_results.strategy_id` → `strategies.id`（级联删除：删除策略时同步删除其结果）
-
-**数据完整性：**
-- `openid` 唯一性约束，防止重复注册
-- `is_active` 布尔字段，支持软删除
-- `created_at` 自动记录创建时间
-- `updated_at` 自动更新修改时间
-
-**JSON字段验证：**
-- `conditions`：存储策略配置，需为有效JSON格式
-- `stocks_json`：存储股票列表，需为有效JSON数组格式
-
-##### 6.4.6 数据库初始化
+### 运行策略脚本
 
 ```python
-from database import init_db
+from stock_service import get_stock_list, run_strategy
+from strategies.steady_rise import strategy_steady_rise
 
-# 创建所有表
-init_db()
+results = run_strategy(
+    lambda stock: strategy_steady_rise(stock, days=5, min_pct=0, max_pct=3),
+    max_workers=10
+)
 ```
 
-**自动创建：**
-- 系统启动时自动检查并创建表结构
-- 也可手动执行 `init.sql` 初始化数据库
+### 调用API
 
-**环境配置：**
-```env
-# MySQL
-DATABASE_URL=mysql+pymysql://root:root@localhost:3306/stock_app
+```bash
+# 获取内置策略
+curl http://localhost:8000/api/strategies/builtin
+
+# 运行稳步上涨策略
+curl -X POST http://localhost:8000/api/strategies/builtin/steady_rise/run?stock_limit=100 \
+  -H "Content-Type: application/json" \
+  -d '{"days": 5, "min_pct": 0, "max_pct": 3, "market_cap_min": 0}'
 ```
-
-### 7. 使用场景
-
-#### 7.1 个人投资者
-- **晨间选股**：每日早盘前自动筛选符合条件的股票
-- **策略验证**：验证自己的选股逻辑是否有效
-- **机会发现**：发现符合特定技术形态的股票
-
-#### 7.2 技术分析爱好者
-- **指标组合**：测试各种技术指标组合效果
-- **形态识别**：识别特定K线形态
-- **趋势跟踪**：跟踪特定趋势信号
-
-#### 7.3 量化交易初学者
-- **策略学习**：学习经典量化策略
-- **代码生成**：AI辅助生成策略代码
-- **回测验证**：验证策略历史表现
-
-### 8. 扩展功能
-
-#### 8.1 数据源扩展
-- **Tushare**：专业金融数据接口
-- **AKShare**：开源财经数据接口
-- **Wind**：机构级数据服务
-
-#### 8.2 策略扩展
-- **回测系统**：策略历史表现验证
-- **实时监控**：盘中实时筛选
-- **组合策略**：多策略组合执行
-
-#### 8.3 社交功能
-- **策略分享**：用户策略社区分享
-- **排行榜**：最受欢迎策略排名
-- **讨论区**：策略讨论交流
-
-#### 8.4 高级功能
-- **付费策略**：高级策略订阅
-- **实时提醒**：微信消息实时推送
-- **数据分析**：策略表现统计分析
-
-## 部署建议
-
-### 后端
-- 使用 Gunicorn + Uvicorn 部署
-- 配置 Nginx 反向代理
-- 使用 MySQL 8.0+ 数据库
-
-### 小程序
-- 需要注册微信小程序账号
-- 配置合法域名
-- 申请订阅消息权限
-
-

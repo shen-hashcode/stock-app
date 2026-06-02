@@ -2,17 +2,21 @@
   "pages": [
     "pages/index/index",
     "pages/strategy/strategy",
-    "pages/result/result"
+    "pages/result/result",
+    "pages/stock/stock"
   ],
   "window": {
-    "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#1a73e8",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#0d1117",
     "navigationBarTitleText": "智能选股",
-    "navigationBarTextStyle": "white"
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0d1117"
   },
   "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#1a73e8",
+    "color": "#8b95a5",
+    "selectedColor": "#00d4ff",
+    "backgroundColor": "#0a0e14",
+    "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/index/index",
