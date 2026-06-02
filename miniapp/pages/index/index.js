@@ -12,7 +12,8 @@ Page({
     runningKey: ''
   },
 
-  onLoad() {
+  onShow() {
+    if (!app.checkLogin()) return
     this.loadBuiltinStrategies()
   },
 

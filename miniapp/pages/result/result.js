@@ -1,3 +1,4 @@
+const app = getApp()
 const { get } = require('../../utils/request')
 
 Page({
@@ -5,6 +6,10 @@ Page({
     strategyId: null,
     results: [],
     selectedDate: ''
+  },
+
+  onShow() {
+    if (!app.checkLogin()) return
   },
 
   onLoad(options) {

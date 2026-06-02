@@ -23,6 +23,7 @@ from typing import Optional, List
 from contextlib import asynccontextmanager
 import json
 import asyncio
+import bcrypt
 from datetime import datetime
 
 # 导入本地模块
@@ -90,12 +91,23 @@ class UserCreate(BaseModel):
     phone: Optional[str] = ""
 
 
+class UserRegister(BaseModel):
+    phone: str
+    password: str
+    nickname: Optional[str] = ""
+
+
+class UserLogin(BaseModel):
+    phone: str
+    password: str
+
+
 class StrategyCreate(BaseModel):
     """
     策略创建请求模型
-    
+
     用于创建内置策略的实例（用户选择内置策略并配置参数）
-    
+
     属性:
         name: 策略名称
         description: 策略描述
@@ -182,6 +194,44 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)  # 刷新以获取自增ID
     return {"code": 0, "data": {"id": db_user.id, "openid": db_user.openid}}
+
+
+@app.post("/api/register")
+def register_user(user: UserRegister, db: Session = Depends(get_db)):
+    """注册新用户（手机号+密码）"""
+    if not user.phone or len(user.phone) != 11:
+        return {"code": 1, "message": "请输入正确的11位手机号"}
+    if not user.password or len(user.password) < 6:
+        return {"code": 1, "message": "密码至少6位"}
+
+    existing = db.query(User).filter(User.phone == user.phone).first()
+    if existing:
+        return {"code": 1, "message": "该手机号已注册"}
+
+    hashed = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
+    db_user = User(
+        openid=f"phone_{user.phone}",
+        phone=user.phone,
+        nickname=user.nickname or f"用户{user.phone[-4:]}",
+        password_hash=hashed.decode('utf-8')
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return {"code": 0, "data": {"id": db_user.id, "phone": db_user.phone, "nickname": db_user.nickname}}
+
+
+@app.post("/api/login")
+def login_user(user: UserLogin, db: Session = Depends(get_db)):
+    """用户登录（手机号+密码）"""
+    db_user = db.query(User).filter(User.phone == user.phone).first()
+    if not db_user or not db_user.password_hash:
+        return {"code": 1, "message": "手机号或密码错误"}
+
+    if not bcrypt.checkpw(user.password.encode('utf-8'), db_user.password_hash.encode('utf-8')):
+        return {"code": 1, "message": "手机号或密码错误"}
+
+    return {"code": 0, "data": {"id": db_user.id, "phone": db_user.phone, "nickname": db_user.nickname}}
 
 
 # ============================================================

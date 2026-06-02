@@ -2,29 +2,39 @@ App({
   globalData: {
     baseUrl: 'http://localhost:8000',
     userInfo: null,
-    userId: null
+    userId: null,
+    userPhone: null,
+    userNickname: null
   },
 
   onLaunch() {
-    this.login()
+    this.restoreSession()
   },
 
-  login() {
-    wx.login({
-      success: (res) => {
-        if (res.code) {
-          const { post } = require('./utils/request')
-          post('/api/users', {
-            openid: res.code,
-            nickname: ''
-          }).then(resp => {
-            if (resp.code === 0) {
-              this.globalData.userId = resp.data.id
-              console.log('登录成功，用户ID:', this.globalData.userId)
-            }
-          })
-        }
-      }
-    })
+  restoreSession() {
+    const userId = wx.getStorageSync('userId')
+    if (userId) {
+      this.globalData.userId = userId
+      this.globalData.userPhone = wx.getStorageSync('userPhone') || ''
+      this.globalData.userNickname = wx.getStorageSync('userNickname') || ''
+    }
+  },
+
+  checkLogin() {
+    if (!this.globalData.userId) {
+      wx.redirectTo({ url: '/pages/login/login' })
+      return false
+    }
+    return true
+  },
+
+  logout() {
+    this.globalData.userId = null
+    this.globalData.userPhone = null
+    this.globalData.userNickname = null
+    wx.removeStorageSync('userId')
+    wx.removeStorageSync('userPhone')
+    wx.removeStorageSync('userNickname')
+    wx.redirectTo({ url: '/pages/login/login' })
   }
 })

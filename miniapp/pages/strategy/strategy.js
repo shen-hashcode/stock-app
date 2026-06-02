@@ -10,6 +10,7 @@ Page({
   },
 
   onShow() {
+    if (!app.checkLogin()) return
     this.loadStrategies()
   },
 

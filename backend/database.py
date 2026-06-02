@@ -96,9 +96,12 @@ class User(Base):
     # 用户昵称
     nickname = Column(String(50))
     
-    # 手机号码
-    phone = Column(String(20))
-    
+    # 手机号码（登录用，唯一）
+    phone = Column(String(20), unique=True, index=True)
+
+    # 密码哈希（bcrypt）
+    password_hash = Column(String(128), nullable=True)
+
     # 注册时间，默认当前时间
     created_at = Column(DateTime, default=datetime.now)
     
