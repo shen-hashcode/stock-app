@@ -4,7 +4,7 @@ const { get } = require('../../utils/request')
 Page({
   data: {
     results: [],
-    loading: true
+    loading: false
   },
 
   onShow() {

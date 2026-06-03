@@ -849,10 +849,11 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
         except (json.JSONDecodeError, AttributeError):
             continue
 
-    # 缓存到Redis（10分钟TTL，结果页访问频率较高）
+    # 缓存到Redis（TTL到当天24点）
     if redis and result_list:
         try:
-            await redis.set(redis_cache_key, json.dumps(result_list, ensure_ascii=False), ex=600)
+            ttl = get_ttl_seconds()
+            await redis.set(redis_cache_key, json.dumps(result_list, ensure_ascii=False), ex=ttl)
         except Exception:
             pass
 
