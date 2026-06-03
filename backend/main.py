@@ -508,12 +508,12 @@ async def run_builtin_strategy(
         except Exception as e:
             logger.warning(f"Redis读取失败: {e}")
 
-    # 第二级：数据库查询当天结果（内置策略结果strategy_id为空）
+    # 第二级：数据库查询当天结果（内置策略结果strategy_id=0）
     if not force:
         today = datetime.now().strftime("%Y-%m-%d")
         db_result = db.query(StrategyResult).filter(
             StrategyResult.run_date == today,
-            StrategyResult.strategy_id.is_(None),
+            StrategyResult.strategy_id == 0,
         ).all()
         for r in db_result:
             try:
@@ -636,8 +636,8 @@ async def _execute_builtin_strategy_background(
             "params": strategy_params,
         }
         result_record = StrategyResult(
-            strategy_id=None,
-            user_id=None,
+            strategy_id=0,
+            user_id=0,
             run_date=today,
             stocks_json=json.dumps(db_data, ensure_ascii=False),
         )
@@ -830,10 +830,10 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
         StrategyResult.run_date == today,
     ).order_by(StrategyResult.created_at.desc()).all()
 
-    # 2. 查内置策略的结果（strategy_id为空的公共结果）
+    # 2. 查内置策略的结果（strategy_id=0的公共结果）
     builtin_results = db.query(StrategyResult).filter(
         StrategyResult.run_date == today,
-        StrategyResult.strategy_id.is_(None),
+        StrategyResult.strategy_id == 0,
     ).order_by(StrategyResult.created_at.desc()).all()
 
     # 组装返回数据
