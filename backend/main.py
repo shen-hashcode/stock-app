@@ -342,57 +342,49 @@ def create_strategy(user_id: int, strategy: StrategyCreate, db: Session = Depend
 
 
 @app.post("/api/strategies/custom")
-async def create_custom_strategy(user_id: int, strategy: CustomStrategyCreate, db: Session = Depends(get_db)):
+async def create_custom_strategy(
+    user_id: int,
+    strategy: CustomStrategyCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
-    创建AI自定义策略
-    
-    用户用自然语言描述选股条件，系统调用AI大模型生成Python脚本
-    
-    参数:
-        user_id: 用户ID
-        strategy: 包含策略名称和自然语言描述
-        db: 数据库会话
-    
-    请求体:
-        {
-            "name": "我的自定义策略",
-            "description": "前3天累计涨幅超过15%，第4天回调，市值大于100亿"
-        }
-    
-    返回:
-        {
-            "code": 0,
-            "data": {
-                "id": 策略ID,
-                "script": "生成的Python脚本代码"
-            }
-        }
-    
-    调用链:
-        小程序首页 -> 输入选股描述 -> 点击"AI生成策略" -> 调用此接口
-        -> 调用AI API生成代码 -> 保存策略和脚本到数据库
+    生成自定义策略
+
+    调用AI大模型生成Python脚本，保存到数据库后立即返回，
+    同时异步推送通知给管理员。
     """
     from stock_service import generate_strategy_script, extract_strategy_name
-    
+    from notify import notify_admins_new_strategy
+
     try:
         # 调用AI大模型生成策略脚本
         script_code = await generate_strategy_script(strategy.description)
-        
+
         # 从描述中提取策略名称
         name = extract_strategy_name(strategy.name)
-        
+
         # 保存策略到数据库
         db_strategy = Strategy(
             user_id=user_id,
             name=name,
             description=strategy.description,
-            script_code=script_code,  # AI生成的Python代码
+            script_code=script_code,
             conditions=json.dumps({"type": "custom", "description": strategy.description})
         )
         db.add(db_strategy)
         db.commit()
         db.refresh(db_strategy)
-        
+
+        # 获取用户昵称
+        user = db.query(User).filter(User.id == user_id).first()
+        user_nickname = user.nickname if user else f"用户{user_id}"
+
+        # 异步通知管理员
+        background_tasks.add_task(
+            notify_admins_new_strategy, user_id, db_strategy.id, name, user_nickname
+        )
+
         return {"code": 0, "data": {"id": db_strategy.id, "script": script_code}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -490,13 +482,14 @@ async def run_builtin_strategy(
     background_tasks: BackgroundTasks,
     params: Optional[dict] = None,
     force: bool = False,
+    db: Session = Depends(get_db),
 ):
     """
-    直接运行内置策略（异步执行 + Redis缓存）
+    直接运行内置策略（三级缓存：Redis → 数据库 → 异步执行）
 
-    - 缓存命中：直接返回结果
-    - 缓存未命中：触发后台异步执行，立即返回执行中状态
-    - force=true：强制刷新缓存
+    1. Redis缓存命中：直接返回
+    2. 数据库当天结果命中：返回并回填Redis
+    3. 都没有：触发后台异步执行，结果先存数据库再缓存Redis
     """
     if strategy_key not in STRATEGIES:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -510,7 +503,7 @@ async def run_builtin_strategy(
     running_key = make_running_key(cache_key)
     redis = get_redis()
 
-    # Redis可用时检查缓存
+    # 第一级：Redis缓存
     if redis and not force:
         try:
             cached = await redis.get(cache_key)
@@ -522,7 +515,39 @@ async def run_builtin_strategy(
         except Exception as e:
             logger.warning(f"Redis读取失败: {e}")
 
-    # 分布式锁：SET NX 原子操作防止重复执行
+    # 第二级：数据库查询当天结果（内置策略结果strategy_id为空）
+    if not force:
+        today = datetime.now().strftime("%Y-%m-%d")
+        db_result = db.query(StrategyResult).filter(
+            StrategyResult.run_date == today,
+            StrategyResult.strategy_id.is_(None),
+        ).all()
+        for r in db_result:
+            try:
+                meta = json.loads(r.stocks_json) if r.stocks_json else {}
+                if isinstance(meta, dict) and meta.get("_strategy_key") == strategy_key:
+                    stocks = meta.get("stocks", [])
+                    result_data = {
+                        "count": len(stocks),
+                        "stocks": stocks,
+                        "params": strategy_params,
+                        "status": "completed",
+                        "from_cache": False,
+                        "from_db": True,
+                        "cached_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                    }
+                    # 回填Redis
+                    if redis:
+                        try:
+                            ttl = get_ttl_seconds()
+                            await redis.set(cache_key, json.dumps(result_data, ensure_ascii=False), ex=ttl)
+                        except Exception:
+                            pass
+                    return {"code": 0, "data": result_data}
+            except (json.JSONDecodeError, AttributeError):
+                continue
+
+    # 第三级：异步执行
     if redis:
         try:
             acquired = await redis.set(running_key, "1", nx=True, ex=300)
@@ -581,7 +606,10 @@ def _run_strategy_sync(check_func, stock_list):
 async def _execute_builtin_strategy_background(
     strategy_key: str, strategy_params: dict, cache_key: str, running_key: str
 ):
-    """后台执行内置策略并缓存结果"""
+    """后台执行内置策略，先存数据库再缓存Redis"""
+    from database import SessionLocal
+
+    db = SessionLocal()
     try:
         builtin_strategy = STRATEGIES[strategy_key]
         check_func = lambda stock, func=builtin_strategy["func"], p=strategy_params: func(stock, **p)
@@ -596,14 +624,32 @@ async def _execute_builtin_strategy_background(
             "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
+        # 先存入数据库
+        today = datetime.now().strftime("%Y-%m-%d")
+        db_data = {
+            "_strategy_key": strategy_key,
+            "stocks": results,
+            "params": strategy_params,
+        }
+        result_record = StrategyResult(
+            strategy_id=None,
+            user_id=None,
+            run_date=today,
+            stocks_json=json.dumps(db_data, ensure_ascii=False),
+        )
+        db.add(result_record)
+        db.commit()
+
+        # 再缓存到Redis
         redis = get_redis()
         if redis:
             ttl = get_ttl_seconds()
             await redis.set(cache_key, json.dumps(result_data, ensure_ascii=False), ex=ttl)
-            logger.info(f"策略[{strategy_key}]执行完成，结果已缓存，筛选出{len(results)}只股票")
+            logger.info(f"策略[{strategy_key}]执行完成，结果已存库并缓存，筛选出{len(results)}只股票")
     except Exception as e:
         logger.error(f"后台执行策略失败[{strategy_key}]: {e}")
     finally:
+        db.close()
         redis = get_redis()
         if redis:
             try:

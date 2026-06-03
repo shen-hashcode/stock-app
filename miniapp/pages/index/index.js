@@ -4,6 +4,7 @@ const { get, post } = require('../../utils/request')
 Page({
   data: {
     builtinStrategies: [],
+    userStrategies: [],
     customName: '',
     customDesc: '',
     showResult: false,
@@ -18,6 +19,7 @@ Page({
   onShow() {
     if (!app.checkLogin()) return
     this.loadBuiltinStrategies()
+    this.loadUserStrategies()
   },
 
   onHide() {
@@ -36,6 +38,16 @@ Page({
     })
   },
 
+  loadUserStrategies() {
+    const userId = app.globalData.userId
+    if (!userId) return
+    get(`/api/strategies/${userId}`).then(res => {
+      if (res.code === 0) {
+        this.setData({ userStrategies: res.data || [] })
+      }
+    })
+  },
+
   selectStrategy(e) {
     const key = e.currentTarget.dataset.key
     if (this.data.polling) return
@@ -48,7 +60,7 @@ Page({
         if (res.data.status === 'completed') {
           this.onStrategyComplete(res.data)
         } else {
-          this.startPolling(key)
+          this.startPolling(key, 'builtin')
         }
       } else {
         this.onStrategyError('执行失败')
@@ -58,9 +70,35 @@ Page({
     })
   },
 
-  startPolling(key) {
+  selectUserStrategy(e) {
+    const id = e.currentTarget.dataset.id
+    if (this.data.polling) return
+
+    const runKey = 'user_' + id
+    this.setData({ runningKey: runKey, polling: true })
+    wx.showLoading({ title: '策略执行中...' })
+
+    post(`/api/strategies/${id}/run`).then(res => {
+      if (res.code === 0) {
+        if (res.data.status === 'completed') {
+          this.onStrategyComplete(res.data)
+        } else {
+          this.startPolling(id, 'user')
+        }
+      } else {
+        this.onStrategyError('执行失败')
+      }
+    }).catch(() => {
+      this.onStrategyError('网络错误')
+    })
+  },
+
+  startPolling(key, type) {
     this._pollTimer = setInterval(() => {
-      post(`/api/strategies/builtin/${key}/run`).then(res => {
+      const url = type === 'builtin'
+        ? `/api/strategies/builtin/${key}/run`
+        : `/api/strategies/${key}/run`
+      post(url).then(res => {
         if (res.code === 0 && res.data.status === 'completed') {
           this.onStrategyComplete(res.data)
         }
@@ -113,7 +151,7 @@ Page({
       return
     }
 
-    wx.showLoading({ title: 'AI生成中...' })
+    wx.showLoading({ title: '生成中...' })
 
     post(`/api/strategies/custom?user_id=${app.globalData.userId}`, {
       name: customName,
@@ -122,9 +160,8 @@ Page({
       wx.hideLoading()
       if (res.code === 0) {
         wx.showToast({ title: '创建成功', icon: 'success' })
-        setTimeout(() => {
-          wx.switchTab({ url: '/pages/strategy/strategy' })
-        }, 1500)
+        this.setData({ customName: '', customDesc: '' })
+        this.loadUserStrategies()
       } else {
         wx.showToast({ title: '创建失败', icon: 'none' })
       }

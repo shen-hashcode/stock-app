@@ -112,6 +112,9 @@ class User(Base):
     # 账号状态，默认启用
     is_active = Column(Boolean, default=True)
 
+    # 是否管理员
+    is_admin = Column(Boolean, default=False)
+
 
 # ============================================================
 # 第四部分：策略表模型
@@ -215,11 +218,11 @@ class StrategyResult(Base):
     # 主键ID
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # 策略ID
-    strategy_id = Column(Integer, index=True)
+    # 策略ID（内置策略结果为空）
+    strategy_id = Column(Integer, index=True, nullable=True)
 
-    # 用户ID
-    user_id = Column(Integer, index=True)
+    # 用户ID（内置策略结果为空）
+    user_id = Column(Integer, index=True, nullable=True)
 
     # 执行日期（字符串格式，如 "2024-01-15"）
     run_date = Column(String(20))
