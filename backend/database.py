@@ -214,16 +214,19 @@ class StrategyResult(Base):
     
     # 主键ID
     id = Column(Integer, primary_key=True, autoincrement=True)
-    
+
     # 策略ID
     strategy_id = Column(Integer, index=True)
-    
+
+    # 用户ID
+    user_id = Column(Integer, index=True)
+
     # 执行日期（字符串格式，如 "2024-01-15"）
     run_date = Column(String(20))
-    
+
     # 筛选结果（JSON格式存储股票列表）
     stocks_json = Column(Text)
-    
+
     # 记录创建时间
     created_at = Column(DateTime, default=datetime.now)
 

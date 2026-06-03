@@ -52,10 +52,13 @@ CREATE TABLE IF NOT EXISTS strategies (
 CREATE TABLE IF NOT EXISTS strategy_results (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '结果唯一标识，自增主键',
     strategy_id INT NOT NULL COMMENT '所属策略ID，关联strategies表',
+    user_id INT COMMENT '所属用户ID，关联users表',
     run_date VARCHAR(20) COMMENT '执行日期，格式：YYYY-MM-DD',
     stocks_json TEXT COMMENT '筛选结果，JSON数组格式',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
     INDEX idx_strategy_results_strategy_id (strategy_id),
+    INDEX idx_strategy_results_user_id (user_id),
     INDEX idx_strategy_results_date (strategy_id, run_date),
-    FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE
+    FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略结果表';

@@ -148,6 +148,7 @@ def daily_strategy_run():
                 # 保存筛选结果
                 result_record = StrategyResult(
                     strategy_id=strategy.id,
+                    user_id=strategy.user_id,
                     run_date=today,
                     stocks_json=json.dumps(results, ensure_ascii=False)
                 )
