@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     openid VARCHAR(100) UNIQUE NOT NULL COMMENT '微信用户唯一标识，用于登录验证',
     nickname VARCHAR(50) COMMENT '用户昵称',
     phone VARCHAR(20) COMMENT '手机号码',
+    password_hash VARCHAR(128) COMMENT '密码哈希值（bcrypt）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
     is_active TINYINT(1) DEFAULT 1 COMMENT '账号状态：1=启用, 0=禁用',
     INDEX idx_users_openid (openid)
