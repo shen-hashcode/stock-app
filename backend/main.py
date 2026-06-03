@@ -546,16 +546,25 @@ def _run_strategy_sync(check_func, stock_list):
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     results = []
+    total = len(stock_list)
+    checked = [0]
+
+    logger.info(f"开始筛选，共{total}只股票")
 
     def process_stock(stock):
         try:
-            if check_func(stock):
+            passed = check_func(stock)
+            checked[0] += 1
+            if checked[0] % 500 == 0:
+                logger.info(f"筛选进度: {checked[0]}/{total}，已命中{len(results)}只")
+            if passed:
                 quote = get_realtime_quote(stock['code'], stock['market'])
                 stock_copy = dict(stock)
                 stock_copy['quote'] = quote
+                logger.info(f"命中: {stock['code']} {stock['name']}")
                 return stock_copy
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"股票{stock['code']}筛选异常: {e}")
         return None
 
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -565,6 +574,7 @@ def _run_strategy_sync(check_func, stock_list):
             if result:
                 results.append(result)
 
+    logger.info(f"筛选完成，共检查{total}只，命中{len(results)}只")
     return results
 
 

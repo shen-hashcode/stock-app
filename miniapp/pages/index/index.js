@@ -9,12 +9,23 @@ Page({
     showResult: false,
     resultCount: 0,
     resultStocks: [],
-    runningKey: ''
+    runningKey: '',
+    polling: false
   },
+
+  _pollTimer: null,
 
   onShow() {
     if (!app.checkLogin()) return
     this.loadBuiltinStrategies()
+  },
+
+  onHide() {
+    this.stopPolling()
+  },
+
+  onUnload() {
+    this.stopPolling()
   },
 
   loadBuiltinStrategies() {
@@ -27,24 +38,59 @@ Page({
 
   selectStrategy(e) {
     const key = e.currentTarget.dataset.key
-    this.setData({ runningKey: key })
-    wx.showLoading({ title: '筛选中...' })
+    if (this.data.polling) return
 
-    post(`/api/strategies/builtin/${key}/run?stock_limit=200`, null, { timeout: 120000 }).then(res => {
-      wx.hideLoading()
+    this.setData({ runningKey: key, polling: true })
+    wx.showLoading({ title: '策略执行中...' })
+
+    post(`/api/strategies/builtin/${key}/run`).then(res => {
       if (res.code === 0) {
-        this.setData({
-          showResult: true,
-          resultCount: res.data.count,
-          resultStocks: res.data.stocks
-        })
+        if (res.data.status === 'completed') {
+          this.onStrategyComplete(res.data)
+        } else {
+          this.startPolling(key)
+        }
       } else {
-        wx.showToast({ title: '执行失败', icon: 'none' })
+        this.onStrategyError('执行失败')
       }
     }).catch(() => {
-      wx.hideLoading()
-      wx.showToast({ title: '网络错误', icon: 'none' })
+      this.onStrategyError('网络错误')
     })
+  },
+
+  startPolling(key) {
+    this._pollTimer = setInterval(() => {
+      post(`/api/strategies/builtin/${key}/run`).then(res => {
+        if (res.code === 0 && res.data.status === 'completed') {
+          this.onStrategyComplete(res.data)
+        }
+      }).catch(() => {})
+    }, 3000)
+  },
+
+  stopPolling() {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer)
+      this._pollTimer = null
+    }
+    this.setData({ polling: false })
+  },
+
+  onStrategyComplete(data) {
+    this.stopPolling()
+    wx.hideLoading()
+    this.setData({
+      showResult: true,
+      resultCount: data.count,
+      resultStocks: data.stocks
+    })
+  },
+
+  onStrategyError(msg) {
+    this.stopPolling()
+    wx.hideLoading()
+    this.setData({ runningKey: '' })
+    wx.showToast({ title: msg, icon: 'none' })
   },
 
   closeModal() {
