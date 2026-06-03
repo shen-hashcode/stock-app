@@ -354,22 +354,14 @@ async def create_custom_strategy(
     调用AI大模型生成Python脚本，保存到数据库后立即返回，
     同时异步推送通知给管理员。
     """
-    from stock_service import generate_strategy_script, extract_strategy_name
     from notify import notify_admins_new_strategy
 
     try:
-        # 调用AI大模型生成策略脚本
-        script_code = await generate_strategy_script(strategy.description)
-
-        # 从描述中提取策略名称
-        name = extract_strategy_name(strategy.name)
-
-        # 保存策略到数据库
+        # 保存策略到数据库（不调用AI生成脚本，由管理员后续处理）
         db_strategy = Strategy(
             user_id=user_id,
-            name=name,
+            name=strategy.name,
             description=strategy.description,
-            script_code=script_code,
             conditions=json.dumps({"type": "custom", "description": strategy.description})
         )
         db.add(db_strategy)
@@ -382,10 +374,10 @@ async def create_custom_strategy(
 
         # 异步通知管理员
         background_tasks.add_task(
-            notify_admins_new_strategy, user_id, db_strategy.id, name, user_nickname
+            notify_admins_new_strategy, user_id, db_strategy.id, strategy.name, user_nickname
         )
 
-        return {"code": 0, "data": {"id": db_strategy.id, "script": script_code}}
+        return {"code": 0, "data": {"id": db_strategy.id}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
