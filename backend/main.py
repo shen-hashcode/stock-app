@@ -32,7 +32,7 @@ from logger import logger
 
 # 导入本地模块
 from database import init_db, get_db, User, Strategy, StrategyResult  # 数据库模型和工具
-from stock_service import get_stock_list, get_stock_list_quick, run_strategy, get_kline_data, get_realtime_quote  # 股票数据服务
+from stock_service import get_stock_list, run_strategy, get_kline_data, get_realtime_quote  # 股票数据服务
 from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
 from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳步上涨策略
 
@@ -488,8 +488,8 @@ async def run_strategy_by_id(strategy_id: int, db: Session = Depends(get_db)):
         else:
             raise HTTPException(status_code=400, detail="未知策略类型")
         
-        # 获取股票列表（限制200只，加快响应）
-        stock_list = get_stock_list_quick(200)
+        # 获取全量股票列表
+        stock_list = get_stock_list()
         
         # 使用线程池并发执行筛选
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -533,7 +533,6 @@ async def run_strategy_by_id(strategy_id: int, db: Session = Depends(get_db)):
 async def run_builtin_strategy(
     strategy_key: str,
     params: Optional[dict] = None,
-    stock_limit: int = 0
 ):
     """
     直接运行内置策略（无需先创建策略）
@@ -543,10 +542,9 @@ async def run_builtin_strategy(
     参数:
         strategy_key: 策略key（如 "rise_pullback", "steady_rise"）
         params: 自定义参数（可选，覆盖默认值）
-        stock_limit: 限制扫描股票数量（0表示全部）
-    
+
     请求示例:
-        POST /api/strategies/builtin/steady_rise/run?stock_limit=1000
+        POST /api/strategies/builtin/steady_rise/run
         Body: {"days": 5, "min_pct": 0, "max_pct": 3, "market_cap_min": 0}
     
     返回:
@@ -578,8 +576,8 @@ async def run_builtin_strategy(
         # 创建检查函数
         check_func = lambda stock, func=builtin_strategy["func"], p=strategy_params: func(stock, **p)
 
-        # 获取股票列表（默认限制200只，加快响应）
-        stock_list = get_stock_list_quick(stock_limit if stock_limit > 0 else 200)
+        # 获取全量股票列表
+        stock_list = get_stock_list()
 
         # 使用线程池并发执行筛选
         from concurrent.futures import ThreadPoolExecutor, as_completed
