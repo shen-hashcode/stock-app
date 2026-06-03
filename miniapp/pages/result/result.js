@@ -4,12 +4,14 @@ const { get } = require('../../utils/request')
 Page({
   data: {
     results: [],
-    loading: false
+    loading: false,
+    runningStrategies: []
   },
 
   onShow() {
     if (!app.checkLogin()) return
     this.loadTodayResults()
+    this.checkRunning()
   },
 
   loadTodayResults() {
@@ -25,6 +27,16 @@ Page({
       }
     }).catch(() => {
       this.setData({ loading: false })
+    })
+  },
+
+  checkRunning() {
+    const userId = app.globalData.userId
+    if (!userId) return
+    get(`/api/strategies/running/${userId}`).then(res => {
+      if (res.code === 0) {
+        this.setData({ runningStrategies: res.data || [] })
+      }
     })
   },
 

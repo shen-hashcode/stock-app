@@ -7,27 +7,13 @@ Page({
     userStrategies: [],
     customName: '',
     customDesc: '',
-    showResult: false,
-    resultCount: 0,
-    resultStocks: [],
-    runningKey: '',
-    polling: false
+    runningKey: ''
   },
-
-  _pollTimer: null,
 
   onShow() {
     if (!app.checkLogin()) return
     this.loadBuiltinStrategies()
     this.loadUserStrategies()
-  },
-
-  onHide() {
-    this.stopPolling()
-  },
-
-  onUnload() {
-    this.stopPolling()
   },
 
   loadBuiltinStrategies() {
@@ -50,89 +36,55 @@ Page({
 
   selectStrategy(e) {
     const key = e.currentTarget.dataset.key
-    if (this.data.polling) return
+    if (this.data.runningKey) return
 
-    this.setData({ runningKey: key, polling: true })
-    wx.showLoading({ title: '策略执行中...' })
+    this.setData({ runningKey: key })
+    wx.showLoading({ title: '查询中...' })
 
     post(`/api/strategies/builtin/${key}/run`).then(res => {
+      wx.hideLoading()
+      this.setData({ runningKey: '' })
       if (res.code === 0) {
         if (res.data.status === 'completed') {
-          this.onStrategyComplete(res.data)
+          wx.switchTab({ url: '/pages/result/result' })
         } else {
-          this.startPolling(key, 'builtin')
+          wx.showToast({ title: '策略执行中，请稍后查看结果', icon: 'none' })
         }
       } else {
-        this.onStrategyError('执行失败')
+        wx.showToast({ title: '执行失败', icon: 'none' })
       }
     }).catch(() => {
-      this.onStrategyError('网络错误')
+      wx.hideLoading()
+      this.setData({ runningKey: '' })
+      wx.showToast({ title: '网络错误', icon: 'none' })
     })
   },
 
   selectUserStrategy(e) {
     const id = e.currentTarget.dataset.id
-    if (this.data.polling) return
+    if (this.data.runningKey) return
 
     const runKey = 'user_' + id
-    this.setData({ runningKey: runKey, polling: true })
-    wx.showLoading({ title: '策略执行中...' })
+    this.setData({ runningKey: runKey })
+    wx.showLoading({ title: '查询中...' })
 
     post(`/api/strategies/${id}/run`).then(res => {
+      wx.hideLoading()
+      this.setData({ runningKey: '' })
       if (res.code === 0) {
         if (res.data.status === 'completed') {
-          this.onStrategyComplete(res.data)
+          wx.switchTab({ url: '/pages/result/result' })
         } else {
-          this.startPolling(id, 'user')
+          wx.showToast({ title: '策略执行中，请稍后查看结果', icon: 'none' })
         }
       } else {
-        this.onStrategyError('执行失败')
+        wx.showToast({ title: '执行失败', icon: 'none' })
       }
     }).catch(() => {
-      this.onStrategyError('网络错误')
+      wx.hideLoading()
+      this.setData({ runningKey: '' })
+      wx.showToast({ title: '网络错误', icon: 'none' })
     })
-  },
-
-  startPolling(key, type) {
-    this._pollTimer = setInterval(() => {
-      const url = type === 'builtin'
-        ? `/api/strategies/builtin/${key}/run`
-        : `/api/strategies/${key}/run`
-      post(url).then(res => {
-        if (res.code === 0 && res.data.status === 'completed') {
-          this.onStrategyComplete(res.data)
-        }
-      }).catch(() => {})
-    }, 3000)
-  },
-
-  stopPolling() {
-    if (this._pollTimer) {
-      clearInterval(this._pollTimer)
-      this._pollTimer = null
-    }
-    this.setData({ polling: false })
-  },
-
-  onStrategyComplete(data) {
-    this.stopPolling()
-    wx.hideLoading()
-    this.setData({
-      showResult: true,
-      resultCount: data.count,
-      resultStocks: data.stocks
-    })
-  },
-
-  onStrategyError(msg) {
-    this.stopPolling()
-    wx.hideLoading()
-    this.setData({ runningKey: '' })
-    wx.showToast({ title: msg, icon: 'none' })
-  },
-
-  closeModal() {
-    this.setData({ showResult: false, runningKey: '' })
   },
 
   onNameInput(e) {

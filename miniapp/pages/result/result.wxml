@@ -7,6 +7,16 @@
     </view>
   </view>
 
+  <!-- 执行中提示 -->
+  <view class="running-tip" wx:if="{{runningStrategies.length > 0}}">
+    <view class="running-tip-inner">
+      <view class="running-dot-wrap">
+        <view class="running-dot"></view>
+      </view>
+      <text class="running-text">正在执行：{{runningStrategies[0].name}}{{runningStrategies.length > 1 ? ' 等' + runningStrategies.length + '个策略' : ''}}，完成后将自动显示结果</text>
+    </view>
+  </view>
+
   <!-- 结果列表 -->
   <view class="result-list">
     <view class="result-card" wx:for="{{results}}" wx:key="id">

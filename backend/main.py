@@ -471,6 +471,7 @@ async def run_strategy_by_id(
 @app.post("/api/strategies/builtin/{strategy_key}/run")
 async def run_builtin_strategy(
     strategy_key: str,
+    request: Request,
     background_tasks: BackgroundTasks,
     params: Optional[dict] = None,
     force: bool = False,
@@ -548,8 +549,19 @@ async def run_builtin_strategy(
         except Exception as e:
             logger.warning(f"Redis锁获取失败: {e}")
 
+    # 记录用户维度的执行中状态
+    user_id = request.headers.get("X-User-Id", "")
+    user_running_key = ""
+    if redis and user_id:
+        user_running_key = f"running:user:{user_id}:{strategy_key}"
+        try:
+            strategy_name = STRATEGIES[strategy_key]["name"]
+            await redis.set(user_running_key, strategy_name, ex=300)
+        except Exception:
+            pass
+
     background_tasks.add_task(
-        _execute_builtin_strategy_background, strategy_key, strategy_params, cache_key, running_key
+        _execute_builtin_strategy_background, strategy_key, strategy_params, cache_key, running_key, user_running_key
     )
     return {"code": 0, "data": {"status": "running", "message": "策略已开始执行，请稍后查询"}}
 
@@ -596,7 +608,7 @@ def _run_strategy_sync(check_func, stock_list):
 
 
 async def _execute_builtin_strategy_background(
-    strategy_key: str, strategy_params: dict, cache_key: str, running_key: str
+    strategy_key: str, strategy_params: dict, cache_key: str, running_key: str, user_running_key: str = ""
 ):
     """后台执行内置策略，先存数据库再缓存Redis"""
     from database import SessionLocal
@@ -648,6 +660,11 @@ async def _execute_builtin_strategy_background(
                 await redis.delete(running_key)
             except Exception:
                 pass
+            if user_running_key:
+                try:
+                    await redis.delete(user_running_key)
+                except Exception:
+                    pass
 
 
 async def _execute_saved_strategy_background(
@@ -768,6 +785,22 @@ def get_user_results(user_id: int, limit: int = 20, db: Session = Depends(get_db
         .limit(limit)\
         .all()
     return {"code": 0, "data": results}
+
+
+@app.get("/api/strategies/running/{user_id}")
+async def get_running_strategies(user_id: int):
+    """查询指定用户是否有策略正在执行中"""
+    redis = get_redis()
+    running_list = []
+    if redis:
+        try:
+            async for key in redis.scan_iter(match=f"running:user:{user_id}:*"):
+                strategy_key = key.split(":")[-1]
+                name = await redis.get(key)
+                running_list.append({"key": strategy_key, "name": name or strategy_key})
+        except Exception as e:
+            logger.warning(f"查询用户running策略失败: {e}")
+    return {"code": 0, "data": running_list}
 
 
 @app.get("/api/results/today/{user_id}")

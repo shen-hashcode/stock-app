@@ -92,27 +92,3 @@
   </view>
 </view>
 
-<!-- 执行结果弹窗 -->
-<view class="modal" wx:if="{{showResult}}">
-  <view class="modal-mask" bindtap="closeModal"></view>
-  <view class="modal-content">
-    <view class="modal-decoration"></view>
-    <view class="modal-title">筛选结果</view>
-    <view class="result-count">
-      <text class="result-number">{{resultCount}}</text>
-      <text class="result-label">只符合条件的股票</text>
-    </view>
-    <scroll-view scroll-y class="result-list">
-      <view class="stock-item" wx:for="{{resultStocks}}" wx:key="code">
-        <view class="stock-info">
-          <view class="stock-name">{{item.name}}</view>
-          <view class="stock-code">{{item.code}}</view>
-        </view>
-        <view class="stock-change {{item.quote && item.quote.change_pct > 0 ? 'up' : 'down'}}">
-          {{item.quote ? item.quote.change_pct : '--'}}%
-        </view>
-      </view>
-    </scroll-view>
-    <view class="btn-primary" bindtap="closeModal">关闭</view>
-  </view>
-</view>
