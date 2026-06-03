@@ -3,38 +3,29 @@ const { get } = require('../../utils/request')
 
 Page({
   data: {
-    strategyId: null,
     results: [],
-    selectedDate: ''
+    loading: true
   },
 
   onShow() {
     if (!app.checkLogin()) return
+    this.loadTodayResults()
   },
 
-  onLoad(options) {
-    if (options.strategyId) {
-      this.setData({ strategyId: options.strategyId })
-      this.loadResults()
-    }
-  },
+  loadTodayResults() {
+    const userId = app.globalData.userId
+    if (!userId) return
 
-  loadResults() {
-    const { strategyId } = this.data
-    if (!strategyId) return
-    get(`/api/results/${strategyId}`).then(res => {
+    this.setData({ loading: true })
+    get(`/api/results/today/${userId}`).then(res => {
       if (res.code === 0) {
-        const results = res.data.map(item => ({
-          ...item,
-          stocks: JSON.parse(item.stocks_json || '[]')
-        }))
-        this.setData({ results })
+        this.setData({ results: res.data || [], loading: false })
+      } else {
+        this.setData({ loading: false })
       }
+    }).catch(() => {
+      this.setData({ loading: false })
     })
-  },
-
-  onDateChange(e) {
-    this.setData({ selectedDate: e.detail.value })
   },
 
   goStockDetail(e) {

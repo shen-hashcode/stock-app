@@ -1,17 +1,9 @@
 <view class="container">
-  <!-- 顶部筛选区 -->
+  <!-- 顶部标题 -->
   <view class="filter-card">
     <view class="filter-title">
       <text class="filter-icon">◉</text>
-      <text>历史记录</text>
-    </view>
-    <view class="date-selector">
-      <picker mode="date" bindchange="onDateChange" value="{{selectedDate}}">
-        <view class="date-btn">
-          <text class="date-icon">▣</text>
-          <text class="date-text">{{selectedDate || '选择日期'}}</text>
-        </view>
-      </picker>
+      <text>今日结果</text>
     </view>
   </view>
 
@@ -21,10 +13,10 @@
       <view class="result-header">
         <view class="result-date">
           <text class="date-dot"></text>
-          {{item.run_date}}
+          {{item.strategy_name}}
         </view>
         <view class="result-count">
-          <text class="count-number">{{item.stocks.length}}</text> 只
+          <text class="count-number">{{item.count}}</text> 只
         </view>
       </view>
       <view class="stock-list">
@@ -34,20 +26,24 @@
             <view class="stock-code">{{stock.code}}</view>
           </view>
           <view class="stock-data">
-            <view class="stock-change {{stock.change_pct > 0 ? 'up' : 'down'}}">
-              {{stock.change_pct || '--'}}%
+            <view class="stock-change {{stock.quote.change_pct > 0 ? 'up' : 'down'}}">
+              {{stock.quote.change_pct || '--'}}%
             </view>
-            <view class="stock-market-cap">{{stock.market_cap}}亿</view>
           </view>
         </view>
       </view>
     </view>
   </view>
 
+  <!-- 加载中 -->
+  <view class="empty-state" wx:if="{{loading}}">
+    <text class="empty-text">加载中...</text>
+  </view>
+
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{results.length === 0}}">
+  <view class="empty-state" wx:if="{{!loading && results.length === 0}}">
     <view class="empty-icon">◇</view>
-    <text class="empty-text">暂无筛选结果</text>
-    <text class="empty-hint">策略执行后将在此显示历史记录</text>
+    <text class="empty-text">今日暂无筛选结果</text>
+    <text class="empty-hint">执行策略后将在此显示当天结果</text>
   </view>
 </view>
