@@ -15,7 +15,7 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
     exit 1
 fi
 
-nohup python main.py >> "$LOG_FILE" 2>&1 &
+nohup python3 main.py >> "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
 echo "智能选股助手已启动"
