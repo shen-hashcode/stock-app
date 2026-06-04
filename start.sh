@@ -7,11 +7,19 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-echo "========================================"
-echo "  智能选股助手 - 启动后端服务"
-echo "  地址: http://localhost:8000"
-echo "  按 Ctrl+C 停止服务"
-echo "========================================"
-echo
+LOG_FILE="app.log"
+PID_FILE="app.pid"
 
-python main.py
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "[错误] 服务已在运行中，PID: $(cat "$PID_FILE")"
+    exit 1
+fi
+
+nohup python main.py >> "$LOG_FILE" 2>&1 &
+echo $! > "$PID_FILE"
+
+echo "智能选股助手已启动"
+echo "  PID: $(cat "$PID_FILE")"
+echo "  地址: http://localhost:8000"
+echo "  日志: backend/$LOG_FILE"
+echo "  停止: ./stop.sh"
