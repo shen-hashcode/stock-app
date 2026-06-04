@@ -1,31 +1,10 @@
 """
-智能选股助手 - 稳步上涨策略模块
+稳步上涨选股策略。
 
-本模块实现"稳步上涨"选股策略：
-- 逻辑：最近N个交易日每日涨幅在指定范围内
-- 适用场景：寻找稳步上涨、波动较小的股票
-
-策略特点：
-- 每日涨幅控制在0%~3%之间（可配置）
-- 避免暴涨暴跌的股票
-- 适合稳健型投资者
-
-使用方式：
-    from strategies.steady_rise import strategy_steady_rise
-    
-    stock_info = {'code': '600519', 'market': 'sh', 'market_cap': 21000}
-    result = strategy_steady_rise(stock_info, days=5, min_pct=0, max_pct=3)
+逻辑：最近 N 个交易日每日涨幅都在 [min_pct, max_pct] 区间内（默认 0%~3%）。
+适用场景：寻找稳步上涨、波动较小的股票。
 """
 
-# ============================================================
-# 第一部分：导入依赖
-# ============================================================
-
-import sys
-import os
-
-# 添加父目录到模块搜索路径，以便导入stock_service
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from stock_service import get_kline_data
 
 

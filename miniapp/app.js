@@ -1,10 +1,7 @@
 App({
   globalData: {
     baseUrl: 'http://121.40.124.210:8000',
-    userInfo: null,
-    userId: null,
-    userPhone: null,
-    userNickname: null
+    userId: null
   },
 
   onLaunch() {
@@ -15,8 +12,6 @@ App({
     const userId = wx.getStorageSync('userId')
     if (userId) {
       this.globalData.userId = userId
-      this.globalData.userPhone = wx.getStorageSync('userPhone') || ''
-      this.globalData.userNickname = wx.getStorageSync('userNickname') || ''
     }
   },
 
@@ -26,15 +21,5 @@ App({
       return false
     }
     return true
-  },
-
-  logout() {
-    this.globalData.userId = null
-    this.globalData.userPhone = null
-    this.globalData.userNickname = null
-    wx.removeStorageSync('userId')
-    wx.removeStorageSync('userPhone')
-    wx.removeStorageSync('userNickname')
-    wx.redirectTo({ url: '/pages/login/login' })
   }
 })

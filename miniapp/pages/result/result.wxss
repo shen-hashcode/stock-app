@@ -29,32 +29,6 @@ page {
   font-size: 28rpx;
 }
 
-.date-selector {
-  display: flex;
-  align-items: center;
-}
-
-.date-btn {
-  display: flex;
-  align-items: center;
-  background: rgba(0, 212, 255, 0.08);
-  border: 1rpx solid rgba(0, 212, 255, 0.2);
-  padding: 14rpx 24rpx;
-  border-radius: 10rpx;
-}
-
-.date-icon {
-  color: #00d4ff;
-  margin-right: 10rpx;
-  font-size: 24rpx;
-}
-
-.date-text {
-  font-size: 26rpx;
-  color: #e2e8f0;
-  font-family: 'SF Mono', monospace;
-}
-
 /* 结果卡片 */
 .result-list {
   display: flex;
@@ -164,13 +138,6 @@ page {
 .stock-change.down {
   color: #00b96b;
   text-shadow: 0 0 8rpx rgba(0, 185, 107, 0.3);
-}
-
-.stock-market-cap {
-  font-size: 22rpx;
-  color: #8b95a5;
-  margin-top: 6rpx;
-  font-family: 'SF Mono', monospace;
 }
 
 /* 执行中提示 */

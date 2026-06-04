@@ -52,11 +52,7 @@ Page({
       this.setData({ loading: false })
       if (res.code === 0) {
         app.globalData.userId = res.data.id
-        app.globalData.userPhone = res.data.phone
-        app.globalData.userNickname = res.data.nickname
         wx.setStorageSync('userId', res.data.id)
-        wx.setStorageSync('userPhone', res.data.phone)
-        wx.setStorageSync('userNickname', res.data.nickname || '')
         wx.switchTab({ url: '/pages/index/index' })
       } else {
         wx.showToast({ title: res.message || '操作失败', icon: 'none' })
@@ -86,9 +82,7 @@ Page({
           this.setData({ loading: false })
           if (res.code === 0) {
             app.globalData.userId = res.data.id
-            app.globalData.userNickname = res.data.nickname || ''
             wx.setStorageSync('userId', res.data.id)
-            wx.setStorageSync('userNickname', res.data.nickname || '')
             wx.switchTab({ url: '/pages/index/index' })
           } else {
             wx.showToast({ title: res.message || '微信登录失败', icon: 'none' })

@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from contextlib import asynccontextmanager
 import json
 import asyncio
@@ -33,8 +33,8 @@ from datetime import datetime, timedelta
 from logger import logger
 
 # 导入本地模块
-from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription  # 数据库模型和工具
-from stock_service import get_stock_list, run_strategy, get_kline_data, get_realtime_quote  # 股票数据服务
+from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription
+from stock_service import get_stock_list, get_kline_data, get_realtime_quote
 from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds
 from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
 from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳步上涨策略
@@ -108,23 +108,8 @@ init_db()
 # 第三部分：Pydantic数据模型（请求/响应结构定义）
 # ============================================================
 
-class UserCreate(BaseModel):
-    """
-    用户创建请求模型
-    
-    用于微信登录时创建或获取用户信息
-    
-    属性:
-        openid: 微信用户唯一标识（由wx.login获取）
-        nickname: 用户昵称（可选）
-        phone: 手机号码（可选）
-    """
-    openid: str
-    nickname: Optional[str] = ""
-    phone: Optional[str] = ""
-
-
 class UserRegister(BaseModel):
+    """手机号 + 密码 注册请求体。"""
     phone: str
     password: str
     nickname: Optional[str] = ""
@@ -139,22 +124,6 @@ class WxLoginRequest(BaseModel):
     """微信小程序登录请求：前端 wx.login 拿到的 code"""
     code: str
     nickname: Optional[str] = ""
-
-
-class StrategyCreate(BaseModel):
-    """
-    策略创建请求模型
-
-    用于创建内置策略的实例（用户选择内置策略并配置参数）
-
-    属性:
-        name: 策略名称
-        description: 策略描述
-        conditions: 策略条件配置（JSON格式），包含type和params
-    """
-    name: str
-    description: str
-    conditions: Optional[str] = "{}"
 
 
 class CustomStrategyCreate(BaseModel):
@@ -176,69 +145,9 @@ class CreateOrderRequest(BaseModel):
     package_id: int
 
 
-class StrategyResponse(BaseModel):
-    """
-    策略响应模型
-    
-    用于返回策略详细信息
-    
-    属性:
-        id: 策略ID
-        name: 策略名称
-        description: 策略描述
-        conditions: 策略条件（JSON字符串）
-        script_code: AI生成的Python脚本代码（仅自定义策略）
-        is_active: 是否启用
-        created_at: 创建时间
-    """
-    id: int
-    name: str
-    description: str
-    conditions: str
-    script_code: Optional[str]
-    is_active: bool
-    created_at: datetime
-    
-    model_config = {"from_attributes": True}  # 允许从ORM对象创建
-
-
 # ============================================================
 # 第四部分：用户管理接口
 # ============================================================
-
-@app.post("/api/users")
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    """
-    创建或获取用户
-    
-    工作流程：
-    1. 根据openid查询用户是否已存在
-    2. 如果存在，直接返回用户信息
-    3. 如果不存在，创建新用户并返回
-    
-    请求参数:
-        user: UserCreate - 用户信息
-        db: Session - 数据库会话（自动注入）
-    
-    返回:
-        {"code": 0, "data": {"id": 用户ID, "openid": 微信openid}}
-    
-    调用链:
-        小程序wx.login -> 获取code -> 调用此接口 -> 返回用户ID
-    """
-    # 查询用户是否已存在
-    db_user = db.query(User).filter(User.openid == user.openid).first()
-    if db_user:
-        # 用户已存在，直接返回
-        return {"code": 0, "data": {"id": db_user.id, "openid": db_user.openid}}
-    
-    # 创建新用户
-    db_user = User(openid=user.openid, nickname=user.nickname, phone=user.phone)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)  # 刷新以获取自增ID
-    return {"code": 0, "data": {"id": db_user.id, "openid": db_user.openid}}
-
 
 @app.post("/api/wx_login")
 def wx_login(req: WxLoginRequest, db: Session = Depends(get_db)):
@@ -370,43 +279,6 @@ def get_builtin_strategies():
     return {"code": 0, "data": strategies}
 
 
-@app.post("/api/strategies")
-def create_strategy(user_id: int, strategy: StrategyCreate, db: Session = Depends(get_db)):
-    """
-    创建用户策略
-    
-    用户选择内置策略后，保存策略配置到数据库
-    
-    参数:
-        user_id: 用户ID（查询参数）
-        strategy: 策略信息（请求体）
-        db: 数据库会话
-    
-    请求体:
-        {
-            "name": "我的涨幅回调策略",
-            "description": "前3日涨幅超过13%时回调买入",
-            "conditions": "{\"type\": \"rise_pullback\", \"params\": {\"days\": 3}}"
-        }
-    
-    返回:
-        {"code": 0, "data": {"id": 策略ID}}
-    
-    调用链:
-        小程序策略页 -> 选择内置策略 -> 配置参数 -> 调用此接口 -> 保存到数据库
-    """
-    db_strategy = Strategy(
-        user_id=user_id,
-        name=strategy.name,
-        description=strategy.description,
-        conditions=strategy.conditions  # JSON格式存储策略类型和参数
-    )
-    db.add(db_strategy)
-    db.commit()
-    db.refresh(db_strategy)
-    return {"code": 0, "data": {"id": db_strategy.id}}
-
-
 @app.post("/api/strategies/custom")
 async def create_custom_strategy(
     user_id: int,
@@ -415,10 +287,10 @@ async def create_custom_strategy(
     db: Session = Depends(get_db),
 ):
     """
-    生成自定义策略
+    用户提交自然语言描述的自定义策略。
 
-    调用AI大模型生成Python脚本，保存到数据库后立即返回，
-    同时异步推送通知给管理员。
+    当前实现：仅入库并通知管理员，由管理员人工编写脚本后再启用。
+    （未自动调用 LLM 生成脚本，避免无人审核的代码直接进入执行链路。）
     """
     from notify import notify_admins_new_strategy
 
@@ -565,6 +437,12 @@ async def run_builtin_strategy(
     """
     if strategy_key not in STRATEGIES:
         raise HTTPException(status_code=404, detail="策略不存在")
+
+    # 7 天试用 + 订阅守卫
+    user_id_header = request.headers.get("X-User-Id", "")
+    allowed, reason = can_access_builtin_strategy(db, user_id_header)
+    if not allowed:
+        return {"code": 2, "message": reason}
 
     builtin_strategy = STRATEGIES[strategy_key]
     strategy_params = {k: v.get("default") for k, v in builtin_strategy["params"].items()}
@@ -825,54 +703,6 @@ async def _execute_saved_strategy_background(
 # 第七部分：结果查询接口
 # ============================================================
 
-@app.get("/api/results/{strategy_id}")
-def get_strategy_results(strategy_id: int, limit: int = 10, db: Session = Depends(get_db)):
-    """
-    获取策略的历史执行结果
-    
-    查询指定策略的所有执行记录，按时间倒序排列
-    
-    参数:
-        strategy_id: 策略ID
-        limit: 返回记录数量限制（默认10条）
-        db: 数据库会话
-    
-    返回:
-        {
-            "code": 0,
-            "data": [
-                {
-                    "id": 结果ID,
-                    "strategy_id": 策略ID,
-                    "run_date": "2024-01-15",
-                    "stocks_json": "[...]",  // 筛选结果JSON
-                    "created_at": "2024-01-15T08:30:00"
-                }
-            ]
-        }
-    
-    调用链:
-        小程序结果tab -> 选择策略 -> 调用此接口 -> 展示历史结果
-    """
-    results = db.query(StrategyResult)\
-        .filter(StrategyResult.strategy_id == strategy_id)\
-        .order_by(StrategyResult.created_at.desc())\
-        .limit(limit)\
-        .all()
-    return {"code": 0, "data": results}
-
-
-@app.get("/api/results/user/{user_id}")
-def get_user_results(user_id: int, limit: int = 20, db: Session = Depends(get_db)):
-    """获取用户的所有策略执行结果"""
-    results = db.query(StrategyResult)\
-        .filter(StrategyResult.user_id == user_id)\
-        .order_by(StrategyResult.created_at.desc())\
-        .limit(limit)\
-        .all()
-    return {"code": 0, "data": results}
-
-
 @app.get("/api/strategies/running/{user_id}")
 async def get_running_strategies(user_id: int):
     """查询指定用户是否有策略正在执行中"""
@@ -1045,6 +875,37 @@ def get_stock_info(code: str, market: str):
 # 第九部分：订阅与支付接口
 # ============================================================
 
+# 未订阅用户试用期（首次登录起）
+TRIAL_DAYS = 7
+
+
+def can_access_builtin_strategy(db: Session, user_id: str) -> tuple[bool, str]:
+    """
+    判断用户是否能跑内置策略。
+    规则：已订阅 → 可用；否则按 users.created_at + TRIAL_DAYS 判断试用期。
+    返回 (允许?, 拒绝原因)
+    """
+    if not user_id:
+        return False, "请先登录"
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return False, "请先登录"
+
+    sub, _ = get_user_active_subscription(db, uid)
+    if sub:
+        return True, ""
+
+    user = db.query(User).filter(User.id == uid).first()
+    if not user:
+        return False, "用户不存在"
+
+    trial_deadline = (user.created_at or datetime.now()) + timedelta(days=TRIAL_DAYS)
+    if datetime.now() <= trial_deadline:
+        return True, ""
+    return False, "试用期已结束，请订阅后继续使用"
+
+
 def get_user_active_subscription(db: Session, user_id: int):
     """获取用户当前有效订阅，返回 (subscription, package) 或 (None, None)"""
     sub = db.query(UserSubscription).filter(
@@ -1086,8 +947,18 @@ def list_subscription_packages(db: Session = Depends(get_db)):
 
 @app.get("/api/subscription/status")
 def get_subscription_status(user_id: int, db: Session = Depends(get_db)):
-    """查询用户订阅状态和剩余策略配额"""
+    """查询用户订阅状态和剩余策略配额（含 7 天试用期信息）"""
     sub, pkg = get_user_active_subscription(db, user_id)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    trial_deadline = None
+    trial_active = False
+    trial_days_remaining = 0
+    if user:
+        trial_deadline = (user.created_at or datetime.now()) + timedelta(days=TRIAL_DAYS)
+        delta = trial_deadline - datetime.now()
+        trial_active = delta.total_seconds() > 0
+        trial_days_remaining = max(0, delta.days + (1 if trial_active and delta.seconds > 0 else 0))
 
     if not sub or not pkg:
         return {
@@ -1098,7 +969,10 @@ def get_subscription_status(user_id: int, db: Session = Depends(get_db)):
                 "strategy_limit": 0,
                 "strategies_used": 0,
                 "strategies_remaining": 0,
-                "expired_at": None
+                "expired_at": None,
+                "trial_active": trial_active,
+                "trial_days_remaining": trial_days_remaining,
+                "trial_expired_at": trial_deadline.strftime("%Y-%m-%d %H:%M:%S") if trial_deadline else None
             }
         }
 
@@ -1115,7 +989,10 @@ def get_subscription_status(user_id: int, db: Session = Depends(get_db)):
             "strategy_limit": pkg.strategy_limit,
             "strategies_used": custom_count,
             "strategies_remaining": max(0, pkg.strategy_limit - custom_count),
-            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None
+            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None,
+            "trial_active": trial_active,
+            "trial_days_remaining": trial_days_remaining,
+            "trial_expired_at": trial_deadline.strftime("%Y-%m-%d %H:%M:%S") if trial_deadline else None
         }
     }
 

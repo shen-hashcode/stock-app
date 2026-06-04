@@ -1,21 +1,16 @@
 """
-内置策略模板
+内置选股策略集合（5 个：涨幅回调 / 放量突破 / 均线金叉 / 连续上涨 / 涨停开板）。
 
-本模块包含5个内置选股策略，每个策略函数接收股票信息字典，返回True/False表示是否符合条件。
+每个策略函数接收股票元信息字典，返回 True/False 表示是否符合条件。
 
-stock_info 结构:
-    - code: 股票代码 (如 "000001")
-    - name: 股票名称
-    - market: 市场 (sh=上海, sz=深圳)
-    - market_cap: 总市值(亿元)
-
-所有策略函数返回: bool (True=符合条件, False=不符合)
+stock_info 结构：
+    code: 股票代码 (如 "000001")
+    name: 股票名称
+    market: 市场 (sh=上海, sz=深圳)
+    market_cap: 总市值(亿元)
 """
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from stock_service import get_kline_data, get_realtime_quote
+from stock_service import get_kline_data
 
 
 def strategy_rise_pullback(stock_info, days=3, rise_pct=13, market_cap_min=50):

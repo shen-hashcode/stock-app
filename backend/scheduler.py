@@ -1,245 +1,250 @@
 """
-智能选股助手 - 定时任务调度模块
+定时任务调度模块。
 
-本模块负责：
-1. 配置定时任务执行时间
-2. 定时执行所有活跃策略
-3. 保存策略执行结果到数据库
+调度器：APScheduler BackgroundScheduler，在 FastAPI lifespan 中启动。
 
-定时任务执行流程：
-1. 从数据库读取所有启用的策略
-2. 获取全量股票列表
-3. 遍历执行每个策略
-4. 保存筛选结果到strategy_results表
+注册的任务：
+1. daily_strategy_run            —— 每天 08:30，跑全部启用的用户策略
+2. warmup_builtin_strategies     —— 每天 16:00，预热全部 6 个内置策略并回填缓存
+3. check_expired_subscriptions   —— 每天 00:05，把到期订阅置 expired
 
-配置项（.env文件）：
-- SCHEDULE_HOUR: 执行小时（0-23），默认8
-- SCHEDULE_MINUTE: 执行分钟（0-59），默认30
-
-使用方式：
-    from scheduler import start_scheduler, stop_scheduler
-    
-    # 启动定时任务
-    start_scheduler()
-    
-    # 停止定时任务
-    stop_scheduler()
+环境变量：
+    SCHEDULE_HOUR / SCHEDULE_MINUTE              用户策略执行时间，默认 08:30
+    BUILTIN_WARMUP_HOUR / BUILTIN_WARMUP_MINUTE  内置策略预热时间，默认 16:00
 """
 
-# ============================================================
-# 第一部分：导入依赖
-# ============================================================
-
-from apscheduler.schedulers.background import BackgroundScheduler  # 后台调度器
-from apscheduler.triggers.cron import CronTrigger  # Cron触发器
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
+import asyncio
 import json
-import logging
 import os
 from dotenv import load_dotenv
 
-# 加载环境变量
+from logger import logger
+
 load_dotenv()
 
-# 创建日志记录器
-logger = logging.getLogger(__name__)
-
 
 # ============================================================
-# 第二部分：配置参数
+# 配置参数
 # ============================================================
 
-# 从环境变量读取定时任务执行时间
-# 默认每天8:30执行
 SCHEDULE_HOUR = int(os.getenv("SCHEDULE_HOUR", "8"))
 SCHEDULE_MINUTE = int(os.getenv("SCHEDULE_MINUTE", "30"))
 
-# 创建后台调度器实例
-# BackgroundScheduler: 在后台线程运行，不阻塞主进程
+BUILTIN_WARMUP_HOUR = int(os.getenv("BUILTIN_WARMUP_HOUR", "16"))
+BUILTIN_WARMUP_MINUTE = int(os.getenv("BUILTIN_WARMUP_MINUTE", "0"))
+
 scheduler = BackgroundScheduler()
 
 
 # ============================================================
-# 第三部分：定时任务函数
+# 定时任务函数
 # ============================================================
 
 def daily_strategy_run():
     """
-    每天定时执行所有活跃策略
-    
-    这是定时任务的核心函数，负责：
-    1. 查询所有is_active=True的策略
-    2. 获取全量股票列表
-    3. 遍历执行每个策略
-    4. 保存筛选结果到数据库
-    
-    执行逻辑：
-    - 对于内置策略：从STRATEGIES字典获取函数和参数
-    - 对于AI自定义策略：动态执行Python脚本
-    
-    异常处理：
-    - 单个策略执行失败不影响其他策略
-    - 所有异常都会记录到日志
-    
-    调用链:
-        APScheduler定时触发 -> daily_strategy_run()
-        -> 查询活跃策略 -> 获取股票列表 -> 执行策略 -> 保存结果
+    每天定时执行全部启用的用户策略。
+
+    流程：查询 is_active=True 的策略 → 获取全量股票 → 逐策略筛选 → 写库。
+    单个策略异常不影响其他策略；裸异常已禁用，所有失败都会写日志。
     """
-    # 导入本地模块（避免循环导入）
     from database import SessionLocal, Strategy, StrategyResult
     from stock_service import get_stock_list, get_realtime_quote
-    from strategies.builtin import STRATEGIES
-    
-    logger.info(f"开始执行定时任务: {datetime.now()}")
-    
-    # 创建数据库会话
+    from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
+    from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
+
+    # 合并全部内置策略，避免 steady_rise 类型被误判 "未知策略" 而跳过
+    all_builtin = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
+
+    logger.info(f"开始执行用户策略定时任务: {datetime.now()}")
+
     db = SessionLocal()
     try:
-        # 查询所有启用的策略
         strategies = db.query(Strategy).filter(Strategy.is_active == True).all()
-        
         if not strategies:
-            logger.info("没有活跃策略")
+            logger.info("没有启用的用户策略，跳过")
             return
-        
-        # 获取全量股票列表（约5000只）
+
         stock_list = get_stock_list()
         today = datetime.now().strftime("%Y-%m-%d")
-        
-        # 遍历执行每个策略
+
         for strategy in strategies:
             try:
                 logger.info(f"执行策略: {strategy.name} (ID: {strategy.id})")
-                
-                # 解析策略条件
+
                 conditions = json.loads(strategy.conditions) if strategy.conditions else {}
                 strategy_type = conditions.get("type", "")
-                
-                # 根据策略类型构建检查函数
+
                 if strategy_type == "custom" and strategy.script_code:
-                    # AI自定义策略：动态执行脚本
+                    # AI/人工自定义策略：动态执行脚本拿 check_stock
                     namespace = {}
                     exec(
                         "from stock_service import get_kline_data, get_realtime_quote\n" + strategy.script_code,
-                        namespace
+                        namespace,
                     )
                     check_func = namespace.get('check_stock')
-                elif strategy_type in STRATEGIES:
-                    # 内置策略：获取函数和参数
-                    builtin = STRATEGIES[strategy_type]
+                elif strategy_type in all_builtin:
+                    # 内置策略：用 func + 默认参数 + 用户覆盖参数
+                    builtin = all_builtin[strategy_type]
                     params = {k: v.get("default") for k, v in builtin["params"].items()}
                     params.update(conditions.get("params", {}))
                     check_func = lambda stock, func=builtin["func"], p=params: func(stock, **p)
                 else:
-                    continue  # 未知策略类型，跳过
-                
-                # 遍历股票执行筛选
+                    logger.warning(f"未知策略类型 {strategy_type}，跳过 (策略 {strategy.id})")
+                    continue
+
                 results = []
                 for stock in stock_list:
                     try:
                         if check_func(stock):
-                            # 符合条件，获取实时行情
                             quote = get_realtime_quote(stock['code'], stock['market'])
                             stock['quote'] = quote
                             results.append(stock)
-                    except:
-                        continue  # 跳过异常股票
-                
-                # 保存筛选结果
-                result_record = StrategyResult(
+                    except Exception as e:
+                        logger.debug(f"股票 {stock.get('code')} 筛选异常: {e}")
+                        continue
+
+                db.add(StrategyResult(
                     strategy_id=strategy.id,
                     user_id=strategy.user_id,
                     run_date=today,
-                    stocks_json=json.dumps(results, ensure_ascii=False)
-                )
-                db.add(result_record)
-                
-                logger.info(f"策略 {strategy.name} 执行完成，找到 {len(results)} 只股票")
-                
+                    stocks_json=json.dumps(results, ensure_ascii=False),
+                ))
+                logger.info(f"策略 {strategy.name} 完成，命中 {len(results)} 只")
             except Exception as e:
                 logger.error(f"策略 {strategy.name} 执行失败: {e}")
-                continue  # 单个策略失败不影响其他策略
-        
-        # 提交所有结果到数据库
+                continue
+
         db.commit()
-        logger.info("定时任务执行完成")
-        
+        logger.info("用户策略定时任务执行完成")
     except Exception as e:
-        logger.error(f"定时任务执行异常: {e}")
+        logger.error(f"用户策略定时任务异常: {e}")
     finally:
-        db.close()  # 确保关闭数据库连接
+        db.close()
 
 
-# ============================================================
-# 第四部分：调度器管理
-# ============================================================
+def warmup_builtin_strategies():
+    """
+    每天 16:00 预跑全部 6 个内置策略。
+    结果写入 strategy_results（strategy_id=0、stocks_json 含 _strategy_key），
+    并回填 Redis 缓存（TTL 到当日 24 点），便于用户当日访问命中。
+    """
+    from database import SessionLocal, StrategyResult
+    from stock_service import get_stock_list
+    from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
+    from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
+    from main import _run_strategy_sync
+    from redis_client import get_redis, make_cache_key, get_ttl_seconds
+
+    all_builtin = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
+    logger.info(f"开始预热内置策略，共 {len(all_builtin)} 个")
+
+    stock_list = get_stock_list()
+    today = datetime.now().strftime("%Y-%m-%d")
+    redis = get_redis()
+
+    db = SessionLocal()
+    try:
+        for key, meta in all_builtin.items():
+            try:
+                params = {k: v.get("default") for k, v in meta["params"].items()}
+                check_func = lambda stock, func=meta["func"], p=params: func(stock, **p)
+
+                logger.info(f"[预热] 执行 {key} ({meta['name']})")
+                results = _run_strategy_sync(check_func, stock_list)
+
+                db_data = {
+                    "_strategy_key": key,
+                    "stocks": results,
+                    "params": params,
+                }
+                db.add(StrategyResult(
+                    strategy_id=0,
+                    user_id=0,
+                    run_date=today,
+                    stocks_json=json.dumps(db_data, ensure_ascii=False),
+                ))
+                db.commit()
+
+                if redis:
+                    cache_key = make_cache_key("builtin", key, params)
+                    result_data = {
+                        "count": len(results),
+                        "stocks": results,
+                        "params": params,
+                        "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    try:
+                        ttl = get_ttl_seconds()
+                        asyncio.run(redis.set(
+                            cache_key, json.dumps(result_data, ensure_ascii=False), ex=ttl,
+                        ))
+                    except Exception as e:
+                        logger.warning(f"[预热] Redis 回填失败 {key}: {e}")
+
+                logger.info(f"[预热] {key} 完成，命中 {len(results)} 只")
+            except Exception as e:
+                logger.error(f"[预热] {key} 失败: {e}")
+                continue
+    finally:
+        db.close()
+    logger.info("内置策略预热完成")
+
 
 def check_expired_subscriptions():
-    """每天检查并标记过期的订阅"""
+    """每天 00:05 把 status=paid 且已过期的订阅标记为 expired。"""
     from database import SessionLocal, UserSubscription
 
     db = SessionLocal()
     try:
         expired = db.query(UserSubscription).filter(
             UserSubscription.status == "paid",
-            UserSubscription.expired_at <= datetime.now()
+            UserSubscription.expired_at <= datetime.now(),
         ).all()
-
         for sub in expired:
             sub.status = "expired"
-
         if expired:
             db.commit()
-            logger.info(f"标记{len(expired)}个过期订阅")
+            logger.info(f"标记 {len(expired)} 个过期订阅")
     except Exception as e:
         logger.error(f"检查过期订阅异常: {e}")
     finally:
         db.close()
 
 
+# ============================================================
+# 调度器管理
+# ============================================================
+
 def start_scheduler():
-    """
-    启动定时任务调度器
-
-    添加daily_strategy_run任务到调度器，并启动调度器
-    任务会按照SCHEDULE_HOUR:SCHEDULE_MINUTE配置的时间每天执行
-
-    调用时机:
-        FastAPI应用启动时（main.py的lifespan函数中）
-
-    调用链:
-        main.py -> lifespan() -> start_scheduler()
-    """
-    # 添加每日策略执行任务
+    """启动定时任务，注册三个 cron job。FastAPI lifespan 启动时调用。"""
     scheduler.add_job(
         daily_strategy_run,
         CronTrigger(hour=SCHEDULE_HOUR, minute=SCHEDULE_MINUTE),
         id="daily_strategy",
-        name="每日策略执行",
-        replace_existing=True
+        name="每日用户策略执行",
+        replace_existing=True,
     )
-
-    # 添加过期订阅检查任务（每天0:05执行）
+    scheduler.add_job(
+        warmup_builtin_strategies,
+        CronTrigger(hour=BUILTIN_WARMUP_HOUR, minute=BUILTIN_WARMUP_MINUTE),
+        id="warmup_builtin",
+        name="内置策略预热",
+        replace_existing=True,
+    )
     scheduler.add_job(
         check_expired_subscriptions,
         CronTrigger(hour=0, minute=5),
         id="check_expired_subs",
         name="检查过期订阅",
-        replace_existing=True
+        replace_existing=True,
     )
-
-    # 启动调度器
     scheduler.start()
-    logger.info(f"定时任务已启动，每天 {SCHEDULE_HOUR}:{SCHEDULE_MINUTE} 执行策略，0:05 检查过期订阅")
-
-
-def stop_scheduler():
-    """
-    停止定时任务调度器
-    
-    关闭调度器，停止所有定时任务
-    
-    调用时机:
-        应用关闭时（可选）
-    """
-    scheduler.shutdown()
+    logger.info(
+        f"定时任务已启动："
+        f"每天 {SCHEDULE_HOUR:02d}:{SCHEDULE_MINUTE:02d} 执行用户策略，"
+        f"{BUILTIN_WARMUP_HOUR:02d}:{BUILTIN_WARMUP_MINUTE:02d} 预热内置策略，"
+        f"00:05 检查过期订阅"
+    )

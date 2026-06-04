@@ -38,7 +38,5 @@ function request(options) {
 
 module.exports = {
   get: (url, data, options) => request({ url, method: 'GET', data, ...options }),
-  post: (url, data, options) => request({ url, method: 'POST', data, ...options }),
-  put: (url, data, options) => request({ url, method: 'PUT', data, ...options }),
-  del: (url, data, options) => request({ url, method: 'DELETE', data, ...options })
+  post: (url, data, options) => request({ url, method: 'POST', data, ...options })
 }

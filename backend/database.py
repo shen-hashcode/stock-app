@@ -25,13 +25,12 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
-import logging
 from dotenv import load_dotenv
 
 # 加载.env环境变量文件
 load_dotenv()
 
-# 导入logger使SQL日志输出到文件
+# 导入 logger 模块以注入 SQL 日志的 handler（副作用 import）
 from logger import sql_logger  # noqa: F401
 
 
@@ -49,13 +48,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://root:root@localhost:33
 #   pool_size: 连接池大小（保持10个空闲连接）
 #   max_overflow: 超出pool_size后最多可创建的连接数
 #   pool_recycle: 连接回收时间（秒），避免MySQL超时断开
-#   echo: 是否打印SQL语句（调试时设为True）
+#   echo: 是否在 SQLAlchemy logger 输出每条 SQL；由 LOG_LEVEL=DEBUG 触发
 engine = create_engine(
     DATABASE_URL,
     pool_size=10,
     max_overflow=20,
     pool_recycle=3600,
-    echo=True
+    echo=os.getenv("LOG_LEVEL", "INFO").upper() == "DEBUG",
 )
 
 # 创建会话工厂
