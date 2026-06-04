@@ -14,4 +14,4 @@ echo "  按 Ctrl+C 停止服务"
 echo "========================================"
 echo
 
-python main.py
+python3 main.py
