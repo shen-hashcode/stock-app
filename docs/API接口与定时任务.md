@@ -272,7 +272,7 @@
 
 获取用户当天**全部**策略结果（含内置 + 自定义）。
 
-**缓存**：Redis 键 `results:today:{user_id}:{YYYY-MM-DD}`，TTL 到当日 24 点
+**缓存**：Redis 键 `results:today:{user_id}:{YYYY-MM-DD}`，TTL 60 秒（仅用于同秒高频请求降压；每次都以 DB 为准）
 
 **响应**
 
@@ -516,7 +516,7 @@
 | `make_cache_key("saved", strategy_id)` | 用户保存策略结果缓存 | 到当日 24 点 |
 | `<cache_key>:running` | 分布式锁（防重复执行） | 300s |
 | `running:user:{user_id}:{strategy_key}` | 用户维度执行中标记（供 `/api/strategies/running` 查询） | 300s |
-| `results:today:{user_id}:{YYYY-MM-DD}` | 用户当天聚合结果 | 到当日 24 点 |
+| `results:today:{user_id}:{YYYY-MM-DD}` | 用户当天聚合结果（每次都查 DB，仅做降压） | 60 秒 |
 
 `get_ttl_seconds()` 返回**当前到当日 24 点的秒数**，全部当日缓存共用。
 

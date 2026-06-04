@@ -722,67 +722,74 @@ async def get_running_strategies(user_id: int):
 @app.get("/api/results/today/{user_id}")
 async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
     """
-    获取用户当天所有策略执行结果（Redis优先，fallback到MySQL）
+    获取用户当天所有策略执行结果（内置 + 自定义）。
 
-    返回当天该用户所有跑出来的结果，包含内置策略和自定义策略。
+    始终以 MySQL 为准查询最新数据，Redis 仅作 60 秒级降压缓存——
+    避免历史空缓存或部分结果缓存遮蔽 DB 中的新结果。
     """
     today = datetime.now().strftime("%Y-%m-%d")
     redis = get_redis()
-
-    # 先从Redis查询用户当天结果缓存
     redis_cache_key = f"results:today:{user_id}:{today}"
+
+    # 短 TTL 缓存：同一秒内多次请求直接复用，避免穿透 DB
     if redis:
         try:
             cached = await redis.get(redis_cache_key)
             if cached:
                 return {"code": 0, "data": json.loads(cached), "from_cache": True}
         except Exception as e:
-            logger.warning(f"Redis读取用户当天结果失败: {e}")
+            logger.warning(f"Redis 读取用户当天结果失败: {e}")
 
-    # Redis没有，查MySQL
     # 1. 查用户自定义策略的结果
     user_results = db.query(StrategyResult).filter(
         StrategyResult.user_id == user_id,
         StrategyResult.run_date == today,
     ).order_by(StrategyResult.created_at.desc()).all()
 
-    # 2. 查内置策略的结果（strategy_id=0的公共结果）
+    # 2. 查内置策略的公共结果（strategy_id=0）
     builtin_results = db.query(StrategyResult).filter(
         StrategyResult.run_date == today,
         StrategyResult.strategy_id == 0,
     ).order_by(StrategyResult.created_at.desc()).all()
 
-    # 组装返回数据
     result_list = []
 
-    # 内置策略结果
+    # 内置策略：按 _strategy_key 去重（保留最新一条）
+    seen_builtin_keys = set()
     for r in builtin_results:
         try:
             meta = json.loads(r.stocks_json) if r.stocks_json else {}
-            if isinstance(meta, dict) and "_strategy_key" in meta:
-                strategy_key = meta["_strategy_key"]
-                strategy_info = STRATEGIES.get(strategy_key, {})
-                result_list.append({
-                    "id": r.id,
-                    "type": "builtin",
-                    "strategy_key": strategy_key,
-                    "strategy_name": strategy_info.get("name", strategy_key),
-                    "run_date": r.run_date,
-                    "stocks": meta.get("stocks", []),
-                    "count": len(meta.get("stocks", [])),
-                    "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-                })
+            if not (isinstance(meta, dict) and "_strategy_key" in meta):
+                continue
+            strategy_key = meta["_strategy_key"]
+            if strategy_key in seen_builtin_keys:
+                continue
+            seen_builtin_keys.add(strategy_key)
+            strategy_info = STRATEGIES.get(strategy_key, {})
+            result_list.append({
+                "id": r.id,
+                "type": "builtin",
+                "strategy_key": strategy_key,
+                "strategy_name": strategy_info.get("name", strategy_key),
+                "run_date": r.run_date,
+                "stocks": meta.get("stocks", []),
+                "count": len(meta.get("stocks", [])),
+                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+            })
         except (json.JSONDecodeError, AttributeError):
             continue
 
-    # 用户自定义策略结果
+    # 用户自定义策略：按 strategy_id 去重（保留最新一条）
+    seen_custom_ids = set()
     for r in user_results:
         try:
             stocks = json.loads(r.stocks_json) if r.stocks_json else []
-            # 跳过内置策略格式的记录（已在上面处理）
+            # 跳过被写到 user_id 维度的内置格式记录（理论上不会发生，防御性）
             if isinstance(stocks, dict) and "_strategy_key" in stocks:
                 continue
-            # 获取策略名称
+            if r.strategy_id in seen_custom_ids:
+                continue
+            seen_custom_ids.add(r.strategy_id)
             strategy = db.query(Strategy).filter(Strategy.id == r.strategy_id).first()
             strategy_name = strategy.name if strategy else f"策略{r.strategy_id}"
             result_list.append({
@@ -798,11 +805,10 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
         except (json.JSONDecodeError, AttributeError):
             continue
 
-    # 缓存到Redis（TTL到当天24点）
-    if redis and result_list:
+    # 60 秒短 TTL 写缓存，仅用于同秒高频请求降压
+    if redis:
         try:
-            ttl = get_ttl_seconds()
-            await redis.set(redis_cache_key, json.dumps(result_list, ensure_ascii=False), ex=ttl)
+            await redis.set(redis_cache_key, json.dumps(result_list, ensure_ascii=False), ex=60)
         except Exception:
             pass
 
