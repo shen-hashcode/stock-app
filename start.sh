@@ -7,6 +7,11 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# 激活虚拟环境
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
 LOG_FILE="app.log"
 PID_FILE="app.pid"
 

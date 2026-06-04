@@ -40,7 +40,6 @@ from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳�
 # 合并所有内置策略到一个字典中，方便统一调用
 STRATEGIES = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
 from scheduler import start_scheduler  # 定时任务调度器
-from wechat_pay import generate_order_no, create_prepay_order, build_payment_params, verify_callback_signature, decrypt_callback_data
 
 
 # ============================================================
@@ -1083,6 +1082,7 @@ def create_subscription_order(
         return {"code": 1, "message": "微信支付需要微信授权登录"}
 
     # 生成订单
+    from wechat_pay import generate_order_no, create_prepay_order, build_payment_params
     order_no = generate_order_no()
     subscription = UserSubscription(
         user_id=user_id,
@@ -1144,6 +1144,7 @@ async def wechat_pay_callback(request: Request, background_tasks: BackgroundTask
     headers = dict(request.headers)
 
     # 验证签名
+    from wechat_pay import verify_callback_signature, decrypt_callback_data
     if not verify_callback_signature(headers, body):
         return {"code": "FAIL", "message": "签名验证失败"}
 
