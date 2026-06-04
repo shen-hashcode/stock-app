@@ -587,7 +587,14 @@ def _run_strategy_sync(check_func, stock_list):
             if checked[0] % 500 == 0:
                 logger.info(f"筛选进度: {checked[0]}/{total}，已命中{len(results)}只")
             if passed:
-                quote = get_realtime_quote(stock['code'], stock['market'])
+                quote = None
+                for attempt in range(3):
+                    quote = get_realtime_quote(stock['code'], stock['market'])
+                    if quote:
+                        break
+                    time.sleep(0.5 * (attempt + 1))
+                if not quote:
+                    quote = {'price': 0, 'change_pct': 0, 'volume': 0, 'market_cap': 0}
                 stock_copy = dict(stock)
                 stock_copy['quote'] = quote
                 logger.info(f"命中: {stock['code']} {stock['name']}")
