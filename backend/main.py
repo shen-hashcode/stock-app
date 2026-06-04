@@ -26,6 +26,8 @@ import json
 import asyncio
 import bcrypt
 import time
+import os
+import requests
 from datetime import datetime, timedelta
 
 from logger import logger
@@ -133,6 +135,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class WxLoginRequest(BaseModel):
+    """微信小程序登录请求：前端 wx.login 拿到的 code"""
+    code: str
+    nickname: Optional[str] = ""
+
+
 class StrategyCreate(BaseModel):
     """
     策略创建请求模型
@@ -230,6 +238,59 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)  # 刷新以获取自增ID
     return {"code": 0, "data": {"id": db_user.id, "openid": db_user.openid}}
+
+
+@app.post("/api/wx_login")
+def wx_login(req: WxLoginRequest, db: Session = Depends(get_db)):
+    """
+    微信小程序登录：用 wx.login 拿到的 code 换 openid，按 openid upsert 用户。
+
+    前端流程：wx.login -> code -> POST /api/wx_login -> 拿到 userId
+    """
+    appid = os.getenv("WECHAT_APPID", "")
+    secret = os.getenv("WECHAT_SECRET", "")
+    if not appid or not secret:
+        return {"code": 1, "message": "服务端未配置微信 AppID / Secret"}
+
+    try:
+        resp = requests.get(
+            "https://api.weixin.qq.com/sns/jscode2session",
+            params={
+                "appid": appid,
+                "secret": secret,
+                "js_code": req.code,
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        data = resp.json()
+    except Exception as e:
+        logger.error(f"调用 jscode2session 异常: {e}")
+        return {"code": 1, "message": f"微信登录服务异常: {e}"}
+
+    openid = data.get("openid")
+    if not openid:
+        logger.warning(f"jscode2session 未返回 openid: {data}")
+        return {"code": 1, "message": data.get("errmsg") or "换取 openid 失败"}
+
+    db_user = db.query(User).filter(User.openid == openid).first()
+    if not db_user:
+        db_user = User(openid=openid, nickname=req.nickname or "")
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    elif req.nickname and not db_user.nickname:
+        db_user.nickname = req.nickname
+        db.commit()
+
+    return {
+        "code": 0,
+        "data": {
+            "id": db_user.id,
+            "openid": db_user.openid,
+            "nickname": db_user.nickname or "",
+        },
+    }
 
 
 @app.post("/api/register")

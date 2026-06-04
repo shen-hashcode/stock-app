@@ -66,5 +66,44 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: '网络错误', icon: 'none' })
     })
+  },
+
+  handleWxLogin() {
+    if (this.data.loading) return
+    this.setData({ loading: true })
+    wx.showLoading({ title: '微信登录中...' })
+
+    wx.login({
+      success: (loginRes) => {
+        if (!loginRes.code) {
+          wx.hideLoading()
+          this.setData({ loading: false })
+          wx.showToast({ title: '微信登录失败', icon: 'none' })
+          return
+        }
+        post('/api/wx_login', { code: loginRes.code, nickname: this.data.nickname || '' }).then(res => {
+          wx.hideLoading()
+          this.setData({ loading: false })
+          if (res.code === 0) {
+            app.globalData.userId = res.data.id
+            app.globalData.userNickname = res.data.nickname || ''
+            wx.setStorageSync('userId', res.data.id)
+            wx.setStorageSync('userNickname', res.data.nickname || '')
+            wx.switchTab({ url: '/pages/index/index' })
+          } else {
+            wx.showToast({ title: res.message || '微信登录失败', icon: 'none' })
+          }
+        }).catch(() => {
+          wx.hideLoading()
+          this.setData({ loading: false })
+          wx.showToast({ title: '网络错误', icon: 'none' })
+        })
+      },
+      fail: () => {
+        wx.hideLoading()
+        this.setData({ loading: false })
+        wx.showToast({ title: '微信登录失败', icon: 'none' })
+      }
+    })
   }
 })

@@ -55,6 +55,19 @@
       <text class="btn-text">{{mode === 'login' ? '登 录' : '注 册'}}</text>
     </view>
 
+    <!-- 分割线 -->
+    <view class="divider">
+      <view class="divider-line"></view>
+      <text class="divider-text">或</text>
+      <view class="divider-line"></view>
+    </view>
+
+    <!-- 微信一键登录 -->
+    <view class="wx-login-btn {{loading ? 'disabled' : ''}}" bindtap="handleWxLogin">
+      <text class="wx-icon">微</text>
+      <text class="wx-text">微信一键登录</text>
+    </view>
+
     <!-- 底部切换提示 -->
     <view class="switch-hint">
       <text class="hint-text">{{mode === 'login' ? '还没有账号？' : '已有账号？'}}</text>
