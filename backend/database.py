@@ -235,7 +235,56 @@ class StrategyResult(Base):
 
 
 # ============================================================
-# 第六部分：数据库工具函数
+# 第六部分：订阅套餐表模型
+# ============================================================
+
+class SubscriptionPackage(Base):
+    """
+    订阅套餐表 (subscription_packages)
+
+    定义可购买的订阅套餐，不同套餐对应不同价格和策略数量上限
+    """
+    __tablename__ = "subscription_packages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50))
+    description = Column(String(200))
+    price_cents = Column(Integer)
+    duration_days = Column(Integer, default=30)
+    strategy_limit = Column(Integer)
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.now)
+
+
+# ============================================================
+# 第七部分：用户订阅记录表模型
+# ============================================================
+
+class UserSubscription(Base):
+    """
+    用户订阅记录表 (user_subscriptions)
+
+    记录用户的订阅订单和状态
+    status: pending-待支付, paid-已支付, expired-已过期, refunded-已退款
+    """
+    __tablename__ = "user_subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, index=True)
+    package_id = Column(Integer, index=True)
+    order_no = Column(String(64), unique=True, index=True)
+    transaction_id = Column(String(64))
+    amount_cents = Column(Integer)
+    status = Column(String(20), default="pending")
+    started_at = Column(DateTime)
+    expired_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.now)
+    paid_at = Column(DateTime)
+
+
+# ============================================================
+# 第八部分：数据库工具函数
 # ============================================================
 
 def init_db():

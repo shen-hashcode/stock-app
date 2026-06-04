@@ -114,8 +114,31 @@ Page({
         wx.showToast({ title: '创建成功', icon: 'success' })
         this.setData({ customName: '', customDesc: '' })
         this.loadUserStrategies()
+      } else if (res.code === 2) {
+        wx.showModal({
+          title: '需要订阅',
+          content: '请先订阅套餐后再创建自定义策略',
+          confirmText: '去订阅',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              wx.navigateTo({ url: '/pages/subscribe/subscribe' })
+            }
+          }
+        })
+      } else if (res.code === 3) {
+        wx.showModal({
+          title: '配额已满',
+          content: res.message || '当前套餐策略数量已达上限',
+          confirmText: '升级套餐',
+          cancelText: '知道了',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              wx.navigateTo({ url: '/pages/subscribe/subscribe' })
+            }
+          }
+        })
       } else {
-        wx.showToast({ title: '创建失败', icon: 'none' })
+        wx.showToast({ title: res.message || '创建失败', icon: 'none' })
       }
     }).catch(() => {
       wx.hideLoading()

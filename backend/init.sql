@@ -63,3 +63,46 @@ CREATE TABLE IF NOT EXISTS strategy_results (
     FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略结果表';
+
+-- ----------------------------------------
+-- 订阅套餐表：定义可购买的套餐
+-- ----------------------------------------
+CREATE TABLE IF NOT EXISTS subscription_packages (
+    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '套餐ID',
+    name VARCHAR(50) NOT NULL COMMENT '套餐名称',
+    description VARCHAR(200) COMMENT '套餐描述',
+    price_cents INT NOT NULL COMMENT '价格（单位：分）',
+    duration_days INT DEFAULT 30 COMMENT '有效期天数',
+    strategy_limit INT NOT NULL COMMENT '可创建的自定义策略数量上限',
+    is_active TINYINT(1) DEFAULT 1 COMMENT '是否上架：1=上架, 0=下架',
+    sort_order INT DEFAULT 0 COMMENT '排序权重，越小越靠前',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订阅套餐表';
+
+-- 初始套餐数据
+INSERT INTO subscription_packages (name, description, price_cents, duration_days, strategy_limit, sort_order) VALUES
+('体验版', '入门体验，可创建1个自定义策略', 990, 30, 1, 1),
+('基础版', '适合个人投资者，可创建3个自定义策略', 2900, 30, 3, 2),
+('专业版', '专业投资者，可创建10个自定义策略', 5900, 30, 10, 3);
+
+-- ----------------------------------------
+-- 用户订阅记录表：记录用户的订阅订单
+-- ----------------------------------------
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '记录ID',
+    user_id INT NOT NULL COMMENT '用户ID',
+    package_id INT NOT NULL COMMENT '套餐ID',
+    order_no VARCHAR(64) UNIQUE NOT NULL COMMENT '系统订单号',
+    transaction_id VARCHAR(64) COMMENT '微信支付交易号',
+    amount_cents INT NOT NULL COMMENT '实付金额（单位：分）',
+    status VARCHAR(20) DEFAULT 'pending' COMMENT '状态：pending/paid/expired/refunded',
+    started_at DATETIME COMMENT '订阅开始时间',
+    expired_at DATETIME COMMENT '订阅过期时间',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    paid_at DATETIME COMMENT '支付完成时间',
+    INDEX idx_user_sub_user (user_id),
+    INDEX idx_user_sub_order (order_no),
+    INDEX idx_user_sub_status (user_id, status),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (package_id) REFERENCES subscription_packages(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户订阅记录表';

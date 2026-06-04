@@ -1,0 +1,50 @@
+<view class="page">
+  <!-- 当前订阅状态 -->
+  <view class="status-card" wx:if="{{subscription && subscription.has_subscription}}">
+    <view class="status-badge active">已订阅</view>
+    <view class="status-info">
+      <text class="pkg-name">{{subscription.package_name}}</text>
+      <text class="expire-text">到期时间: {{subscription.expired_at}}</text>
+      <text class="quota-text">策略配额: {{subscription.strategies_used}}/{{subscription.strategy_limit}}</text>
+    </view>
+  </view>
+
+  <view class="status-card" wx:elif="{{!loading}}">
+    <view class="status-badge inactive">未订阅</view>
+    <view class="status-info">
+      <text class="hint-text">订阅后即可创建自定义选股策略</text>
+    </view>
+  </view>
+
+  <!-- 套餐列表 -->
+  <view class="section-title">选择套餐</view>
+
+  <view class="package-list">
+    <view class="package-card" wx:for="{{packages}}" wx:key="id">
+      <view class="package-header">
+        <text class="package-name">{{item.name}}</text>
+        <view class="package-price">
+          <text class="price-num">{{item.price_cents / 100}}</text>
+          <text class="price-unit">元/月</text>
+        </view>
+      </view>
+      <view class="package-desc">{{item.description}}</view>
+      <view class="package-detail">
+        <text>有效期: {{item.duration_days}}天</text>
+        <text>策略上限: {{item.strategy_limit}}个</text>
+      </view>
+      <button
+        class="buy-btn"
+        data-id="{{item.id}}"
+        bindtap="buyPackage"
+        disabled="{{paying}}"
+      >
+        {{paying ? '处理中...' : '立即订阅'}}
+      </button>
+    </view>
+  </view>
+
+  <view class="loading-container" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+</view>

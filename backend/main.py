@@ -26,12 +26,12 @@ import json
 import asyncio
 import bcrypt
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from logger import logger
 
 # 导入本地模块
-from database import init_db, get_db, User, Strategy, StrategyResult  # 数据库模型和工具
+from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription  # 数据库模型和工具
 from stock_service import get_stock_list, run_strategy, get_kline_data, get_realtime_quote  # 股票数据服务
 from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds
 from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
@@ -40,6 +40,7 @@ from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳�
 # 合并所有内置策略到一个字典中，方便统一调用
 STRATEGIES = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
 from scheduler import start_scheduler  # 定时任务调度器
+from wechat_pay import generate_order_no, create_prepay_order, build_payment_params, verify_callback_signature, decrypt_callback_data
 
 
 # ============================================================
@@ -152,15 +153,20 @@ class StrategyCreate(BaseModel):
 class CustomStrategyCreate(BaseModel):
     """
     自定义策略创建请求模型
-    
+
     用于AI生成自定义策略（用户用自然语言描述选股条件）
-    
+
     属性:
         name: 策略名称
         description: 用自然语言描述的选股条件
     """
     name: str
     description: str
+
+
+class CreateOrderRequest(BaseModel):
+    """创建订阅订单请求"""
+    package_id: int
 
 
 class StrategyResponse(BaseModel):
@@ -357,6 +363,19 @@ async def create_custom_strategy(
     from notify import notify_admins_new_strategy
 
     try:
+        # 订阅检查
+        _, pkg = get_user_active_subscription(db, user_id)
+        if not pkg:
+            return {"code": 2, "message": "请先订阅套餐后再创建自定义策略"}
+
+        # 配额检查
+        custom_count = db.query(Strategy).filter(
+            Strategy.user_id == user_id,
+            Strategy.conditions.like('%"type": "custom"%')
+        ).count()
+        if custom_count >= pkg.strategy_limit:
+            return {"code": 3, "message": f"当前套餐最多创建{pkg.strategy_limit}个自定义策略，已达上限"}
+
         # 保存策略到数据库（不调用AI生成脚本，由管理员后续处理）
         db_strategy = Strategy(
             user_id=user_id,
@@ -963,7 +982,231 @@ def get_stock_info(code: str, market: str):
 
 
 # ============================================================
-# 第九部分：应用启动入口
+# 第九部分：订阅与支付接口
+# ============================================================
+
+def get_user_active_subscription(db: Session, user_id: int):
+    """获取用户当前有效订阅，返回 (subscription, package) 或 (None, None)"""
+    sub = db.query(UserSubscription).filter(
+        UserSubscription.user_id == user_id,
+        UserSubscription.status == "paid",
+        UserSubscription.expired_at > datetime.now()
+    ).order_by(UserSubscription.expired_at.desc()).first()
+
+    if sub:
+        pkg = db.query(SubscriptionPackage).filter(
+            SubscriptionPackage.id == sub.package_id
+        ).first()
+        return sub, pkg
+    return None, None
+
+
+@app.get("/api/subscription/packages")
+def list_subscription_packages(db: Session = Depends(get_db)):
+    """获取所有上架的订阅套餐"""
+    packages = db.query(SubscriptionPackage).filter(
+        SubscriptionPackage.is_active == True
+    ).order_by(SubscriptionPackage.sort_order).all()
+
+    return {
+        "code": 0,
+        "data": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "price_cents": p.price_cents,
+                "duration_days": p.duration_days,
+                "strategy_limit": p.strategy_limit
+            }
+            for p in packages
+        ]
+    }
+
+
+@app.get("/api/subscription/status")
+def get_subscription_status(user_id: int, db: Session = Depends(get_db)):
+    """查询用户订阅状态和剩余策略配额"""
+    sub, pkg = get_user_active_subscription(db, user_id)
+
+    if not sub or not pkg:
+        return {
+            "code": 0,
+            "data": {
+                "has_subscription": False,
+                "package_name": None,
+                "strategy_limit": 0,
+                "strategies_used": 0,
+                "strategies_remaining": 0,
+                "expired_at": None
+            }
+        }
+
+    custom_count = db.query(Strategy).filter(
+        Strategy.user_id == user_id,
+        Strategy.conditions.like('%"type": "custom"%')
+    ).count()
+
+    return {
+        "code": 0,
+        "data": {
+            "has_subscription": True,
+            "package_name": pkg.name,
+            "strategy_limit": pkg.strategy_limit,
+            "strategies_used": custom_count,
+            "strategies_remaining": max(0, pkg.strategy_limit - custom_count),
+            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None
+        }
+    }
+
+
+@app.post("/api/subscription/create_order")
+def create_subscription_order(
+    user_id: int,
+    req: CreateOrderRequest,
+    db: Session = Depends(get_db)
+):
+    """创建订阅支付订单，返回前端支付参数"""
+    # 验证套餐存在
+    pkg = db.query(SubscriptionPackage).filter(
+        SubscriptionPackage.id == req.package_id,
+        SubscriptionPackage.is_active == True
+    ).first()
+    if not pkg:
+        return {"code": 1, "message": "套餐不存在或已下架"}
+
+    # 获取用户openid
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return {"code": 1, "message": "用户不存在"}
+    if not user.openid or user.openid.startswith("phone_"):
+        return {"code": 1, "message": "微信支付需要微信授权登录"}
+
+    # 生成订单
+    order_no = generate_order_no()
+    subscription = UserSubscription(
+        user_id=user_id,
+        package_id=req.package_id,
+        order_no=order_no,
+        amount_cents=pkg.price_cents,
+        status="pending"
+    )
+    db.add(subscription)
+    db.commit()
+
+    # 调用微信统一下单
+    result = create_prepay_order(
+        order_no=order_no,
+        amount_cents=pkg.price_cents,
+        description=f"智能选股助手-{pkg.name}",
+        openid=user.openid
+    )
+
+    if "error" in result:
+        return {"code": 1, "message": result["error"]}
+
+    # 生成前端支付参数
+    payment_params = build_payment_params(result["prepay_id"])
+
+    return {
+        "code": 0,
+        "data": {
+            "order_no": order_no,
+            "payment_params": payment_params
+        }
+    }
+
+
+@app.get("/api/subscription/order/{order_no}")
+def query_order_status(order_no: str, user_id: int, db: Session = Depends(get_db)):
+    """查询订单状态（前端支付后轮询）"""
+    sub = db.query(UserSubscription).filter(
+        UserSubscription.order_no == order_no,
+        UserSubscription.user_id == user_id
+    ).first()
+
+    if not sub:
+        return {"code": 1, "message": "订单不存在"}
+
+    return {
+        "code": 0,
+        "data": {
+            "status": sub.status,
+            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None
+        }
+    }
+
+
+@app.post("/api/pay/callback")
+async def wechat_pay_callback(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """微信支付回调通知"""
+    body = await request.body()
+    headers = dict(request.headers)
+
+    # 验证签名
+    if not verify_callback_signature(headers, body):
+        return {"code": "FAIL", "message": "签名验证失败"}
+
+    # 解析回调数据
+    try:
+        callback_data = json.loads(body)
+    except Exception:
+        return {"code": "FAIL", "message": "数据格式错误"}
+
+    if callback_data.get("event_type") != "TRANSACTION.SUCCESS":
+        return {"code": "SUCCESS", "message": ""}
+
+    # 解密通知内容
+    resource = callback_data.get("resource", {})
+    order_data = decrypt_callback_data(resource)
+    if not order_data:
+        return {"code": "FAIL", "message": "解密失败"}
+
+    order_no = order_data.get("out_trade_no")
+    transaction_id = order_data.get("transaction_id")
+
+    # 查找订单
+    sub = db.query(UserSubscription).filter(
+        UserSubscription.order_no == order_no
+    ).first()
+    if not sub:
+        logger.warning(f"回调找不到订单: {order_no}")
+        return {"code": "SUCCESS", "message": ""}
+
+    # 幂等：已支付则直接返回成功
+    if sub.status == "paid":
+        return {"code": "SUCCESS", "message": ""}
+
+    # 激活订阅
+    pkg = db.query(SubscriptionPackage).filter(
+        SubscriptionPackage.id == sub.package_id
+    ).first()
+
+    now = datetime.now()
+    sub.status = "paid"
+    sub.transaction_id = transaction_id
+    sub.paid_at = now
+    sub.started_at = now
+    sub.expired_at = now + timedelta(days=pkg.duration_days if pkg else 30)
+    db.commit()
+
+    # 异步通知管理员
+    user = db.query(User).filter(User.id == sub.user_id).first()
+    nickname = user.nickname if user else f"用户{sub.user_id}"
+    pkg_name = pkg.name if pkg else "未知套餐"
+
+    from notify import notify_admins_new_subscription
+    background_tasks.add_task(
+        notify_admins_new_subscription,
+        sub.user_id, nickname, pkg_name, sub.amount_cents
+    )
+
+    logger.info(f"订阅激活成功: 用户{sub.user_id}, 套餐{pkg_name}, 订单{order_no}")
+    return {"code": "SUCCESS", "message": ""}
+
+
+# ============================================================
+# 第十部分：应用启动入口
 # ============================================================
 
 if __name__ == "__main__":

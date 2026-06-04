@@ -4,7 +4,8 @@
     "pages/login/login",
     "pages/strategy/strategy",
     "pages/result/result",
-    "pages/stock/stock"
+    "pages/stock/stock",
+    "pages/subscribe/subscribe"
   ],
   "window": {
     "backgroundTextStyle": "dark",

@@ -174,31 +174,63 @@ def daily_strategy_run():
 # 第四部分：调度器管理
 # ============================================================
 
+def check_expired_subscriptions():
+    """每天检查并标记过期的订阅"""
+    from database import SessionLocal, UserSubscription
+
+    db = SessionLocal()
+    try:
+        expired = db.query(UserSubscription).filter(
+            UserSubscription.status == "paid",
+            UserSubscription.expired_at <= datetime.now()
+        ).all()
+
+        for sub in expired:
+            sub.status = "expired"
+
+        if expired:
+            db.commit()
+            logger.info(f"标记{len(expired)}个过期订阅")
+    except Exception as e:
+        logger.error(f"检查过期订阅异常: {e}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """
     启动定时任务调度器
-    
+
     添加daily_strategy_run任务到调度器，并启动调度器
     任务会按照SCHEDULE_HOUR:SCHEDULE_MINUTE配置的时间每天执行
-    
+
     调用时机:
         FastAPI应用启动时（main.py的lifespan函数中）
-    
+
     调用链:
         main.py -> lifespan() -> start_scheduler()
     """
-    # 添加定时任务
+    # 添加每日策略执行任务
     scheduler.add_job(
         daily_strategy_run,
-        CronTrigger(hour=SCHEDULE_HOUR, minute=SCHEDULE_MINUTE),  # Cron表达式
+        CronTrigger(hour=SCHEDULE_HOUR, minute=SCHEDULE_MINUTE),
         id="daily_strategy",
         name="每日策略执行",
-        replace_existing=True  # 替换已存在的同名任务
+        replace_existing=True
     )
-    
+
+    # 添加过期订阅检查任务（每天0:05执行）
+    scheduler.add_job(
+        check_expired_subscriptions,
+        CronTrigger(hour=0, minute=5),
+        id="check_expired_subs",
+        name="检查过期订阅",
+        replace_existing=True
+    )
+
     # 启动调度器
     scheduler.start()
-    logger.info(f"定时任务已启动，每天 {SCHEDULE_HOUR}:{SCHEDULE_MINUTE} 执行")
+    logger.info(f"定时任务已启动，每天 {SCHEDULE_HOUR}:{SCHEDULE_MINUTE} 执行策略，0:05 检查过期订阅")
 
 
 def stop_scheduler():
