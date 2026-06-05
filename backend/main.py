@@ -36,11 +36,7 @@ from logger import logger
 from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription
 from stock_service import get_stock_list, get_kline_data, get_realtime_quote
 from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds, invalidate_results_cache
-from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
-from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳步上涨策略
-
-# 合并所有内置策略到一个字典中，方便统一调用
-STRATEGIES = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
+from strategies.builtin import STRATEGIES  # 内置策略（6 个）
 from scheduler import start_scheduler  # 定时任务调度器
 
 

@@ -501,7 +501,7 @@
 **作用**：在用户访问高峰前，把全部 6 个内置策略预跑一遍，写库 + 回填 Redis，让用户当天查询直接命中缓存
 
 **逻辑**：
-1. 合并 `BUILTIN_STRATEGIES` + `STEADY_RISE_STRATEGIES` → 共 6 个
+1. 从 `strategies.builtin.STRATEGIES` 拿到全部 6 个内置策略
 2. `get_stock_list()` 一次（之后 6 个策略共享内存缓存）
 3. 串行跑每个策略（使用默认参数）：
    - 调 `_run_strategy_sync(check_func, stock_list)`

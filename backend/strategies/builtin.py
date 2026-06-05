@@ -1,5 +1,5 @@
 """
-内置选股策略集合（5 个：涨幅回调 / 放量突破 / 均线金叉 / 连续上涨 / 涨停开板）。
+内置选股策略集合（6 个：涨幅回调 / 放量突破 / 均线金叉 / 连续上涨 / 涨停开板 / 稳步上涨）。
 
 每个策略函数接收股票元信息字典，返回 True/False 表示是否符合条件。
 
@@ -230,6 +230,49 @@ def strategy_limit_up_open(stock_info, market_cap_min=50):
     return is_limit_up and is_open_low
 
 
+def strategy_steady_rise(stock_info, days=6, min_pct=0, max_pct=3, market_cap_min=50):
+    """
+    策略6: 稳步上涨
+
+    逻辑: 最近N个交易日每日涨幅都在 (min_pct, max_pct) 区间内
+    适用场景: 寻找稳步上涨、波动较小的股票
+
+    参数:
+        stock_info: 股票信息字典
+        days: 检查的交易日天数，默认6天
+        min_pct: 最小涨幅(%)，默认0%（即允许平盘以上）
+        max_pct: 最大涨幅(%)，默认3%（避免暴涨）
+        market_cap_min: 最低市值(亿)，默认50亿
+
+    返回: bool - 符合条件返回True
+    """
+    code = stock_info['code']
+    market = stock_info['market']
+    market_cap = stock_info['market_cap']
+
+    # 市值过滤
+    if market_cap < market_cap_min:
+        return False
+
+    # 需要 days+1 根 K 线才能计算 days 天的涨幅
+    klines = get_kline_data(code, market, days=days + 1)
+    if not klines or len(klines) < days + 1:
+        return False
+
+    recent = klines[-(days + 1):]
+    for i in range(1, days + 1):
+        prev_close = recent[i - 1]['close']
+        curr_close = recent[i]['close']
+        if prev_close == 0:
+            return False
+        change_pct = (curr_close - prev_close) / prev_close * 100
+        # 必须严格在 (min_pct, max_pct) 区间内，区间外有任意一日就不符合
+        if change_pct <= min_pct or change_pct >= max_pct:
+            return False
+
+    return True
+
+
 """
 策略注册表
 
@@ -297,6 +340,17 @@ STRATEGIES = {
         "description": "昨日涨停，今日开板低开",
         "func": strategy_limit_up_open,
         "params": {
+            "market_cap_min": {"type": "float", "default": 50, "label": "最低市值(亿)"}
+        }
+    },
+    "steady_rise": {
+        "name": "稳步上涨",
+        "description": "最近N个交易日每日涨幅在 (min_pct, max_pct) 区间内",
+        "func": strategy_steady_rise,
+        "params": {
+            "days": {"type": "int", "default": 6, "label": "交易日天数"},
+            "min_pct": {"type": "float", "default": 0, "label": "最小涨幅(%)"},
+            "max_pct": {"type": "float", "default": 3, "label": "最大涨幅(%)"},
             "market_cap_min": {"type": "float", "default": 50, "label": "最低市值(亿)"}
         }
     }

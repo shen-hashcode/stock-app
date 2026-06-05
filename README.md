@@ -11,12 +11,10 @@ stock_app/
 │   ├── database.py               # 数据库模型
 │   ├── stock_service.py          # 股票数据服务
 │   ├── scheduler.py              # 定时任务
-│   ├── run_steady_rise.py        # 策略运行脚本
 │   ├── .env                      # 环境配置
 │   ├── requirements.txt          # Python依赖
 │   └── strategies/               # 策略模块
-│       ├── builtin.py            # 5个内置策略
-│       └── steady_rise.py        # 稳步上涨策略
+│       └── builtin.py            # 6个内置策略
 │
 └── miniapp/                      # 微信小程序
     ├── app.js                    # 应用入口
@@ -145,13 +143,14 @@ LLM_MODEL=deepseek-chat
 ### 运行策略脚本
 
 ```python
-from stock_service import get_stock_list, run_strategy
-from strategies.steady_rise import strategy_steady_rise
+from strategies.builtin import STRATEGIES, strategy_steady_rise
 
-results = run_strategy(
-    lambda stock: strategy_steady_rise(stock, days=5, min_pct=0, max_pct=3),
-    max_workers=10
-)
+# 通过策略字典调用
+meta = STRATEGIES["steady_rise"]
+result = meta["func"](stock_info, days=5, min_pct=0, max_pct=3)
+
+# 或直接调用函数
+result = strategy_steady_rise(stock_info, days=5, min_pct=0, max_pct=3)
 ```
 
 ### 调用API

@@ -52,11 +52,7 @@ def daily_strategy_run():
     """
     from database import SessionLocal, Strategy, StrategyResult
     from stock_service import get_stock_list, get_realtime_quote
-    from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
-    from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
-
-    # 合并全部内置策略，避免 steady_rise 类型被误判 "未知策略" 而跳过
-    all_builtin = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
+    from strategies.builtin import STRATEGIES as all_builtin
 
     logger.info(f"开始执行用户策略定时任务: {datetime.now()}")
 
@@ -133,12 +129,10 @@ def warmup_builtin_strategies():
     """
     from database import SessionLocal, StrategyResult
     from stock_service import get_stock_list
-    from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
-    from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
+    from strategies.builtin import STRATEGIES as all_builtin
     from main import _run_strategy_sync
     from redis_client import get_redis, make_cache_key, get_ttl_seconds, invalidate_results_cache
 
-    all_builtin = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
     logger.info(f"开始预热内置策略，共 {len(all_builtin)} 个")
 
     stock_list = get_stock_list()
