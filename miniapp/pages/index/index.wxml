@@ -30,13 +30,8 @@
             {{param.label}}: {{param.default}}
           </view>
         </view>
-        <view class="strategy-run-hint" wx:if="{{runningKey !== item.key}}">
-          <text class="run-icon">▶</text> 点击执行
-        </view>
-        <view class="strategy-loading" wx:if="{{runningKey === item.key}}">
-          <view class="loading-dot"></view>
-          <view class="loading-dot"></view>
-          <view class="loading-dot"></view>
+        <view class="strategy-run-hint">
+          <text class="run-icon">▶</text> 点击查看
         </view>
       </view>
     </view>

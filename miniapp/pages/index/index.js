@@ -35,28 +35,17 @@ Page({
   },
 
   selectStrategy(e) {
-    const key = e.currentTarget.dataset.key
-    if (this.data.runningKey) return
-
-    this.setData({ runningKey: key })
-    wx.showLoading({ title: '查询中...' })
-
-    post(`/api/strategies/builtin/${key}/run`).then(res => {
-      wx.hideLoading()
-      this.setData({ runningKey: '' })
-      if (res.code === 0) {
-        if (res.data.status === 'completed') {
+    // 热门策略由系统每日 16:00 自动执行，普通用户无需手动跑——直接引导到结果页
+    wx.showModal({
+      title: '热门策略',
+      content: '热门策略由系统每日自动执行，是否前往结果页查看？',
+      confirmText: '去看看',
+      cancelText: '取消',
+      success: (res) => {
+        if (res.confirm) {
           wx.switchTab({ url: '/pages/result/result' })
-        } else {
-          wx.showToast({ title: '策略执行中，请稍后查看结果', icon: 'none' })
         }
-      } else {
-        wx.showToast({ title: '执行失败', icon: 'none' })
       }
-    }).catch(() => {
-      wx.hideLoading()
-      this.setData({ runningKey: '' })
-      wx.showToast({ title: '网络错误', icon: 'none' })
     })
   },
 

@@ -35,7 +35,7 @@ from logger import logger
 # 导入本地模块
 from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription
 from stock_service import get_stock_list, get_kline_data, get_realtime_quote
-from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds
+from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds, invalidate_today_results_cache
 from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
 from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳步上涨策略
 
@@ -438,9 +438,9 @@ async def run_builtin_strategy(
     if strategy_key not in STRATEGIES:
         raise HTTPException(status_code=404, detail="策略不存在")
 
-    # 7 天试用 + 订阅守卫
+    # 执行守卫：仅管理员可手动执行内置（热门）策略，普通用户引导到结果页查看
     user_id_header = request.headers.get("X-User-Id", "")
-    allowed, reason = can_access_builtin_strategy(db, user_id_header)
+    allowed, reason = can_execute_builtin_strategy(db, user_id_header)
     if not allowed:
         return {"code": 2, "message": reason}
 
@@ -608,6 +608,9 @@ async def _execute_builtin_strategy_background(
         db.add(result_record)
         db.commit()
 
+        # 失效"当天结果"聚合缓存，让结果页立刻能读到这条新数据
+        await invalidate_today_results_cache()
+
         # 再缓存到Redis
         redis = get_redis()
         if redis:
@@ -675,6 +678,9 @@ async def _execute_saved_strategy_background(
         db.add(result_record)
         db.commit()
 
+        # 失效"当天结果"聚合缓存，让结果页立刻能读到这条新数据
+        await invalidate_today_results_cache()
+
         # 缓存结果
         result_data = {
             "count": len(results),
@@ -726,10 +732,17 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
 
     始终以 MySQL 为准查询最新数据，Redis 仅作 60 秒级降压缓存——
     避免历史空缓存或部分结果缓存遮蔽 DB 中的新结果。
+
+    权限：
+    - 自定义策略结果：用户自己的，始终可见
+    - 内置（热门）策略结果：仅管理员 / 已订阅 / 7 天试用期内可见
     """
     today = datetime.now().strftime("%Y-%m-%d")
     redis = get_redis()
+    # 缓存按 user_id 分桶，本身就已经隔离了"是否能看 builtin"的差异
     redis_cache_key = f"results:today:{user_id}:{today}"
+
+    can_see_builtin, _ = can_view_builtin_results(db, user_id)
 
     # 短 TTL 缓存：同一秒内多次请求直接复用，避免穿透 DB
     if redis:
@@ -746,11 +759,14 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
         StrategyResult.run_date == today,
     ).order_by(StrategyResult.created_at.desc()).all()
 
-    # 2. 查内置策略的公共结果（strategy_id=0）
-    builtin_results = db.query(StrategyResult).filter(
-        StrategyResult.run_date == today,
-        StrategyResult.strategy_id == 0,
-    ).order_by(StrategyResult.created_at.desc()).all()
+    # 2. 查内置策略的公共结果（strategy_id=0）。无权查看时跳过这次 DB 查询
+    if can_see_builtin:
+        builtin_results = db.query(StrategyResult).filter(
+            StrategyResult.run_date == today,
+            StrategyResult.strategy_id == 0,
+        ).order_by(StrategyResult.created_at.desc()).all()
+    else:
+        builtin_results = []
 
     result_list = []
 
@@ -885,31 +901,59 @@ def get_stock_info(code: str, market: str):
 TRIAL_DAYS = 7
 
 
-def can_access_builtin_strategy(db: Session, user_id: str) -> tuple[bool, str]:
-    """
-    判断用户是否能跑内置策略。
-    规则：已订阅 → 可用；否则按 users.created_at + TRIAL_DAYS 判断试用期。
-    返回 (允许?, 拒绝原因)
-    """
-    if not user_id:
-        return False, "请先登录"
+def _parse_user_id(user_id_raw) -> Optional[int]:
+    """规范化 header 里的 user_id。失败返回 None。"""
+    if not user_id_raw:
+        return None
     try:
-        uid = int(user_id)
+        return int(user_id_raw)
     except (TypeError, ValueError):
+        return None
+
+
+def can_execute_builtin_strategy(db: Session, user_id_raw) -> tuple[bool, str]:
+    """
+    判断用户是否能手动执行内置（热门）策略。
+
+    规则：仅管理员（User.is_admin=True）可执行。普通用户应到结果页查看
+    系统每日 16:00 自动产出的公共结果。
+    """
+    uid = _parse_user_id(user_id_raw)
+    if uid is None:
         return False, "请先登录"
+
+    user = db.query(User).filter(User.id == uid).first()
+    if not user:
+        return False, "用户不存在"
+    if not user.is_admin:
+        return False, "热门策略由系统每日自动执行，请到结果页查看"
+    return True, ""
+
+
+def can_view_builtin_results(db: Session, user_id_raw) -> tuple[bool, str]:
+    """
+    判断用户是否有权查看内置（热门）策略的当日结果。
+
+    规则：管理员 → 允许；已订阅 → 允许；否则按 users.created_at + TRIAL_DAYS 判断试用期。
+    """
+    uid = _parse_user_id(user_id_raw)
+    if uid is None:
+        return False, "请先登录"
+
+    user = db.query(User).filter(User.id == uid).first()
+    if not user:
+        return False, "用户不存在"
+    if user.is_admin:
+        return True, ""
 
     sub, _ = get_user_active_subscription(db, uid)
     if sub:
         return True, ""
 
-    user = db.query(User).filter(User.id == uid).first()
-    if not user:
-        return False, "用户不存在"
-
     trial_deadline = (user.created_at or datetime.now()) + timedelta(days=TRIAL_DAYS)
     if datetime.now() <= trial_deadline:
         return True, ""
-    return False, "试用期已结束，请订阅后继续使用"
+    return False, "试用期已结束，请订阅后继续查看热门策略结果"
 
 
 def get_user_active_subscription(db: Session, user_id: int):
