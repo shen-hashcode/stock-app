@@ -21,7 +21,8 @@ Page({
     this.setData({ loading: true })
     get(`/api/results/${userId}`).then(res => {
       if (res.code === 0) {
-        this.setData({ results: res.data || [], loading: false })
+        const results = (res.data || []).map(r => ({ ...r, collapsed: true }))
+        this.setData({ results, loading: false })
       } else {
         this.setData({ loading: false })
       }
