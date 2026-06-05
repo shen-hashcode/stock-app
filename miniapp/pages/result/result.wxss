@@ -203,3 +203,21 @@ page {
   font-size: 24rpx;
   color: #4a5568;
 }
+
+/* 折叠箭头 */
+.fold-arrow {
+  display: inline-block;
+  margin-left: 12rpx;
+  color: #8b95a5;
+  font-size: 24rpx;
+  transition: transform 0.2s ease;
+}
+
+.fold-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+/* 头部点击反馈 */
+.result-header:active {
+  background: rgba(0, 212, 255, 0.06);
+}
