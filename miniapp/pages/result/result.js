@@ -41,6 +41,12 @@ Page({
     })
   },
 
+  toggleCard(e) {
+    const i = e.currentTarget.dataset.index
+    const key = `results[${i}].collapsed`
+    this.setData({ [key]: !this.data.results[i].collapsed })
+  },
+
   goStockDetail(e) {
     const { code, market } = e.currentTarget.dataset
     wx.navigateTo({
