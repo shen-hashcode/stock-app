@@ -19,7 +19,7 @@ Page({
     if (!userId) return
 
     this.setData({ loading: true })
-    get(`/api/results/today/${userId}`).then(res => {
+    get(`/api/results/${userId}`).then(res => {
       if (res.code === 0) {
         this.setData({ results: res.data || [], loading: false })
       } else {

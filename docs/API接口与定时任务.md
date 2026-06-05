@@ -24,7 +24,7 @@
 | 用户登录 | `POST /api/users`、`POST /api/wx_login`、`POST /api/register`、`POST /api/login` |
 | 策略管理 | `GET /api/strategies/builtin`、`POST /api/strategies`、`POST /api/strategies/custom`、`GET /api/strategies/{user_id}` |
 | 策略执行 | `POST /api/strategies/{strategy_id}/run`、`POST /api/strategies/builtin/{strategy_key}/run` |
-| 结果查询 | `GET /api/results/{strategy_id}`、`GET /api/results/user/{user_id}`、`GET /api/strategies/running/{user_id}`、`GET /api/results/today/{user_id}` |
+| 结果查询 | `GET /api/results/{strategy_id}`、`GET /api/results/user/{user_id}`、`GET /api/strategies/running/{user_id}`、`GET /api/results/{user_id}` |
 | 股票行情 | `GET /api/stock/{code}` |
 | 订阅与支付 | `GET /api/subscription/packages`、`GET /api/subscription/status`、`POST /api/subscription/create_order`、`GET /api/subscription/order/{order_no}`、`POST /api/pay/callback` |
 
@@ -268,11 +268,22 @@
 
 **响应**：`{ "code": 0, "data": [{ "key": "rise_pullback", "name": "涨幅回调" }, ...] }`
 
-## 14. GET /api/results/today/{user_id} ★ 首页常用
+## 14. GET /api/results/{user_id} ★ 首页常用
 
-获取用户当天**全部**策略结果（含内置 + 自定义）。
+获取用户**指定日期**的全部策略结果（含内置 + 自定义）。
 
-**缓存**：Redis 键 `results:today:{user_id}:{YYYY-MM-DD}`，TTL 60 秒（仅用于同秒高频请求降压；每次都以 DB 为准）
+**路径参数**：`user_id` 用户 ID
+**查询参数**：`date` 可选，格式 `YYYY-MM-DD`，不传默认今天；格式不合法返回 `{ "code": 1, "message": "日期格式错误，应为 YYYY-MM-DD" }`
+
+**示例**：
+- `GET /api/results/2`（今天）
+- `GET /api/results/2?date=2026-06-04`（指定历史日期）
+
+**权限（按 `user_id` 解析当前用户身份）**：
+- 自定义策略结果：始终可见（用户自己的）
+- 内置（热门）策略结果：仅 **管理员 / 已订阅 / 7 天试用期内** 可见；无权时 `data` 中只包含 `type=custom` 条目
+
+**缓存**：Redis 键 `results:{user_id}:{date}`，TTL 60 秒（仅用于同秒高频请求降压；每次都以 DB 为准）
 
 **响应**
 
@@ -516,7 +527,7 @@
 | `make_cache_key("saved", strategy_id)` | 用户保存策略结果缓存 | 到当日 24 点 |
 | `<cache_key>:running` | 分布式锁（防重复执行） | 300s |
 | `running:user:{user_id}:{strategy_key}` | 用户维度执行中标记（供 `/api/strategies/running` 查询） | 300s |
-| `results:today:{user_id}:{YYYY-MM-DD}` | 用户当天聚合结果（每次都查 DB，仅做降压） | 60 秒 |
+| `results:{user_id}:{YYYY-MM-DD}` | 用户某日聚合结果（每次都查 DB，仅做降压） | 60 秒 |
 
 `get_ttl_seconds()` 返回**当前到当日 24 点的秒数**，全部当日缓存共用。
 
@@ -593,7 +604,7 @@ wx.login -> code
   → POST /api/wx_login { code }
   → 拿到 userId 存进 storage
   → GET /api/subscription/status?user_id=X   // 显示试用剩余天数
-  → GET /api/results/today/{userId}          // 首页展示当日已有结果
+  → GET /api/results/{userId}                // 首页展示当日已有结果
 ```
 
 ## B. 用户主动跑一个内置策略
@@ -607,7 +618,7 @@ Redis 命中？→ 直接返回
 DB 当天结果命中？→ 返回 + 回填 Redis
 都没有？→ background_tasks 异步执行，立即返回 { status: "running" }
   ↓
-前端轮询 GET /api/results/today/{userId} 直到出现该策略结果
+前端轮询 GET /api/results/{userId} 直到出现该策略结果
 ```
 
 ## C. 订阅下单到支付完成

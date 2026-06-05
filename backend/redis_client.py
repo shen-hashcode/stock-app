@@ -71,26 +71,29 @@ def get_ttl_seconds() -> int:
     return max(remaining, 3600)
 
 
-async def invalidate_today_results_cache() -> int:
+async def invalidate_results_cache(date: str = None) -> int:
     """
-    扫描并删除当天所有用户的 results:today:* 缓存。
+    扫描并删除指定日期所有用户的 results:{user_id}:{date} 缓存。
 
     在策略结果写库后调用，让用户下一次请求立刻从 DB 读到最新数据，
-    无需等待 results:today 缓存的 60 秒 TTL 自然过期。
+    无需等待 60 秒 TTL 自然过期。
+
+    参数:
+        date: YYYY-MM-DD 格式；不传默认今天。
 
     返回删除的 key 数量；Redis 不可用或扫描失败返回 0。
     """
     redis = get_redis()
     if not redis:
         return 0
-    today = datetime.now().strftime("%Y-%m-%d")
-    pattern = f"results:today:*:{today}"
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+    pattern = f"results:*:{date}"
     deleted = 0
     try:
         async for key in redis.scan_iter(match=pattern, count=100):
             await redis.delete(key)
             deleted += 1
     except Exception:
-        # 失效操作失败不影响主流程；下次读时 60s TTL 兜底
         return deleted
     return deleted

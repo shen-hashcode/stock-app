@@ -35,7 +35,7 @@ from logger import logger
 # 导入本地模块
 from database import init_db, get_db, User, Strategy, StrategyResult, SubscriptionPackage, UserSubscription
 from stock_service import get_stock_list, get_kline_data, get_realtime_quote
-from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds, invalidate_today_results_cache
+from redis_client import init_redis, close_redis, get_redis, make_cache_key, make_running_key, get_ttl_seconds, invalidate_results_cache
 from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES  # 内置策略
 from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES  # 稳步上涨策略
 
@@ -609,7 +609,7 @@ async def _execute_builtin_strategy_background(
         db.commit()
 
         # 失效"当天结果"聚合缓存，让结果页立刻能读到这条新数据
-        await invalidate_today_results_cache()
+        await invalidate_results_cache()
 
         # 再缓存到Redis
         redis = get_redis()
@@ -679,7 +679,7 @@ async def _execute_saved_strategy_background(
         db.commit()
 
         # 失效"当天结果"聚合缓存，让结果页立刻能读到这条新数据
-        await invalidate_today_results_cache()
+        await invalidate_results_cache()
 
         # 缓存结果
         result_data = {
@@ -725,22 +725,38 @@ async def get_running_strategies(user_id: int):
     return {"code": 0, "data": running_list}
 
 
-@app.get("/api/results/today/{user_id}")
-async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
+@app.get("/api/results/{user_id}")
+async def get_user_results_by_date(
+    user_id: int,
+    date: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     """
-    获取用户当天所有策略执行结果（内置 + 自定义）。
+    获取用户指定日期的所有策略执行结果（内置 + 自定义）。
 
-    始终以 MySQL 为准查询最新数据，Redis 仅作 60 秒级降压缓存——
-    避免历史空缓存或部分结果缓存遮蔽 DB 中的新结果。
+    参数:
+        user_id: 路径参数，用户 ID
+        date: 查询日期 YYYY-MM-DD；不传默认今天
+
+    始终以 MySQL 为准查询，Redis 仅作 60 秒级降压缓存。
 
     权限：
     - 自定义策略结果：用户自己的，始终可见
     - 内置（热门）策略结果：仅管理员 / 已订阅 / 7 天试用期内可见
     """
-    today = datetime.now().strftime("%Y-%m-%d")
+    # 校验 / 默认日期
+    if date:
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return {"code": 1, "message": "日期格式错误，应为 YYYY-MM-DD"}
+        run_date = date
+    else:
+        run_date = datetime.now().strftime("%Y-%m-%d")
+
     redis = get_redis()
-    # 缓存按 user_id 分桶，本身就已经隔离了"是否能看 builtin"的差异
-    redis_cache_key = f"results:today:{user_id}:{today}"
+    # 缓存按 user_id + date 分桶
+    redis_cache_key = f"results:{user_id}:{run_date}"
 
     can_see_builtin, _ = can_view_builtin_results(db, user_id)
 
@@ -751,18 +767,18 @@ async def get_user_today_results(user_id: int, db: Session = Depends(get_db)):
             if cached:
                 return {"code": 0, "data": json.loads(cached), "from_cache": True}
         except Exception as e:
-            logger.warning(f"Redis 读取用户当天结果失败: {e}")
+            logger.warning(f"Redis 读取用户结果失败: {e}")
 
     # 1. 查用户自定义策略的结果
     user_results = db.query(StrategyResult).filter(
         StrategyResult.user_id == user_id,
-        StrategyResult.run_date == today,
+        StrategyResult.run_date == run_date,
     ).order_by(StrategyResult.created_at.desc()).all()
 
     # 2. 查内置策略的公共结果（strategy_id=0）。无权查看时跳过这次 DB 查询
     if can_see_builtin:
         builtin_results = db.query(StrategyResult).filter(
-            StrategyResult.run_date == today,
+            StrategyResult.run_date == run_date,
             StrategyResult.strategy_id == 0,
         ).order_by(StrategyResult.created_at.desc()).all()
     else:

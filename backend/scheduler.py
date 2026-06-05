@@ -136,7 +136,7 @@ def warmup_builtin_strategies():
     from strategies.builtin import STRATEGIES as BUILTIN_STRATEGIES
     from strategies.steady_rise import STRATEGIES as STEADY_RISE_STRATEGIES
     from main import _run_strategy_sync
-    from redis_client import get_redis, make_cache_key, get_ttl_seconds, invalidate_today_results_cache
+    from redis_client import get_redis, make_cache_key, get_ttl_seconds, invalidate_results_cache
 
     all_builtin = {**BUILTIN_STRATEGIES, **STEADY_RISE_STRATEGIES}
     logger.info(f"开始预热内置策略，共 {len(all_builtin)} 个")
@@ -170,9 +170,9 @@ def warmup_builtin_strategies():
 
                 # 失效"当天结果"聚合缓存，让结果页立刻能读到这条新数据
                 try:
-                    asyncio.run(invalidate_today_results_cache())
+                    asyncio.run(invalidate_results_cache())
                 except Exception as e:
-                    logger.warning(f"[预热] 失效 results:today 缓存失败 {key}: {e}")
+                    logger.warning(f"[预热] 失效 results 缓存失败 {key}: {e}")
 
                 if redis:
                     cache_key = make_cache_key("builtin", key, params)
