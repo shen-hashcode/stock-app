@@ -20,16 +20,17 @@
   <!-- 结果列表 -->
   <view class="result-list">
     <view class="result-card" wx:for="{{results}}" wx:key="id">
-      <view class="result-header">
+      <view class="result-header" bindtap="toggleCard" data-index="{{index}}">
         <view class="result-date">
           <text class="date-dot"></text>
           {{item.strategy_name}}
         </view>
         <view class="result-count">
           <text class="count-number">{{item.count}}</text> 只
+          <text class="fold-arrow {{item.collapsed ? '' : 'expanded'}}">∨</text>
         </view>
       </view>
-      <view class="stock-list">
+      <view class="stock-list" wx:if="{{!item.collapsed}}">
         <view class="stock-item" wx:for="{{item.stocks}}" wx:for-item="stock" wx:key="code" bindtap="goStockDetail" data-code="{{stock.code}}" data-market="{{stock.market}}">
           <view class="stock-info">
             <view class="stock-name">{{stock.name}}</view>
