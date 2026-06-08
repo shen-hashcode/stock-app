@@ -190,12 +190,18 @@ def get_realtime_quote(code, market):
     """
     获取股票实时行情。
 
-    返回 {price, change_pct, volume, market_cap(亿)}；失败返回 None。
+    返回 {name, code, price, open, high, low, change_pct, volume, market_cap(亿)}；
+    失败返回 None。
 
     字段位置（腾讯协议固定）：
+        parts[1]  - 名称
+        parts[2]  - 代码
         parts[3]  - 现价
+        parts[5]  - 今开
+        parts[33] - 最高
+        parts[34] - 最低
         parts[32] - 涨跌幅 (%)
-        parts[36] - 成交量
+        parts[36] - 成交额 (万)
         parts[45] - 总市值 (亿)
     """
     try:
@@ -205,12 +211,24 @@ def get_realtime_quote(code, market):
         if r.status_code != 200:
             return None
 
-        parts = r.text.split('~')
-        if len(parts) < 40:
+        raw = r.text.strip()
+        eq_idx = raw.find('=')
+        if eq_idx != -1:
+            raw = raw[eq_idx + 1:]
+            if raw.startswith('"') and raw.endswith('"'):
+                raw = raw[1:-1]
+
+        parts = raw.split('~')
+        if len(parts) < 46:
             return None
 
         return {
+            'name': parts[1] or '',
+            'code': parts[2] or '',
             'price': float(parts[3]) if parts[3] else 0,
+            'open': float(parts[5]) if parts[5] else 0,
+            'high': float(parts[33]) if parts[33] else 0,
+            'low': float(parts[34]) if parts[34] else 0,
             'change_pct': float(parts[32]) if parts[32] else 0,
             'volume': float(parts[36]) if parts[36] else 0,
             'market_cap': float(parts[45]) if parts[45] else 0,

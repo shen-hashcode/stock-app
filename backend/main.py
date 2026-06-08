@@ -887,6 +887,8 @@ def get_stock_info(code: str, market: str):
     """
     # 获取实时行情
     quote = get_realtime_quote(code, market)
+    if not quote:
+        return {"code": 1, "message": "未找到该股票"}
     
     # 获取K线数据
     kline = get_kline_data(code, market)
@@ -899,7 +901,7 @@ def get_stock_info(code: str, market: str):
     return {
         "code": 0,
         "data": {
-            "quote": quote,
+            **quote,
             "kline": kline_data
         }
     }
