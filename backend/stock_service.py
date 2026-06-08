@@ -129,6 +129,7 @@ def validate_stocks_batch(codes_batch):
             except (ValueError, IndexError):
                 total_market_cap = 0
             market = 'sh' if line.startswith('v_sh') else 'sz'
+            print(f'验证股票 {line}')
             valid_stocks.append({
                 'code': code,
                 'name': name,
