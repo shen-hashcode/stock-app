@@ -37,8 +37,8 @@
             <view class="stock-code">{{stock.code}}</view>
           </view>
           <view class="stock-data">
-            <view class="stock-change {{stock.quote.change_pct > 0 ? 'up' : 'down'}}">
-              {{stock.quote.change_pct || '--'}}%
+            <view class="stock-change {{stock._changePct > 0 ? 'up' : 'down'}}">
+              {{stock._changePct}}%
             </view>
           </view>
         </view>

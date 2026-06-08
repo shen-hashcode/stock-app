@@ -30,7 +30,7 @@ Page({
       if (res.code === 0) {
         const results = (res.data || [])
           .filter(r => r.strategy_id === strategyId)
-          .map(r => ({ ...r, collapsed: true }))
+          .map(r => this._normalizeResult(r))
         this.setData({ results, loading: false })
       } else {
         this.setData({ loading: false })
@@ -47,7 +47,7 @@ Page({
     this.setData({ loading: true })
     get(`/api/results/${userId}`).then(res => {
       if (res.code === 0) {
-        const results = (res.data || []).map(r => ({ ...r, collapsed: true }))
+        const results = (res.data || []).map(r => this._normalizeResult(r))
         this.setData({ results, loading: false })
       } else {
         this.setData({ loading: false })
@@ -55,6 +55,17 @@ Page({
     }).catch(() => {
       this.setData({ loading: false })
     })
+  },
+
+  _normalizeResult(r) {
+    return {
+      ...r,
+      collapsed: true,
+      stocks: (r.stocks || []).map(s => ({
+        ...s,
+        _changePct: (s.quote && s.quote.change_pct != null) ? s.quote.change_pct : '--'
+      }))
+    }
   },
 
   checkRunning() {
