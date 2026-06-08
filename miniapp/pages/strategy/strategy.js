@@ -26,8 +26,9 @@ Page({
 
   viewResult(e) {
     const id = e.currentTarget.dataset.id
-    wx.navigateTo({
-      url: `/pages/result/result?strategyId=${id}`
+    app.globalData.viewStrategyId = id
+    wx.switchTab({
+      url: '/pages/result/result'
     })
   }
 })

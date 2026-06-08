@@ -10,8 +10,34 @@ Page({
 
   onShow() {
     if (!app.checkLogin()) return
-    this.loadTodayResults()
+
+    const strategyId = app.globalData.viewStrategyId
+    if (strategyId) {
+      app.globalData.viewStrategyId = null
+      this.loadStrategyResults(strategyId)
+    } else {
+      this.loadTodayResults()
+    }
     this.checkRunning()
+  },
+
+  loadStrategyResults(strategyId) {
+    const userId = app.globalData.userId
+    if (!userId) return
+
+    this.setData({ loading: true })
+    get(`/api/results/${userId}`).then(res => {
+      if (res.code === 0) {
+        const results = (res.data || [])
+          .filter(r => r.strategy_id === strategyId)
+          .map(r => ({ ...r, collapsed: true }))
+        this.setData({ results, loading: false })
+      } else {
+        this.setData({ loading: false })
+      }
+    }).catch(() => {
+      this.setData({ loading: false })
+    })
   },
 
   loadTodayResults() {
