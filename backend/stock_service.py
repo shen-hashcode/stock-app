@@ -30,18 +30,66 @@ QQ_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 # ============================================================
 
 def generate_stock_codes():
-    """生成沪深 A 股全部候选代码（未必都有效，调用方需再过滤）。"""
+    """从东方财富 API 实时获取沪深 A 股全部代码，替换原来的范围枚举法。"""
     codes = []
-    # 上海主板 600000-603999
+    page = 1
+    page_size = 5000
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://www.eastmoney.com/",
+    }
+    base_url = "http://80.push2.eastmoney.com/api/qt/clist/get"
+
+    try:
+        while True:
+            params = {
+                "pn": page,
+                "pz": page_size,
+                "po": 1,
+                "np": 1,
+                "fid": "f3",
+                "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
+                "fields": "f12,f14",
+            }
+            r = requests.get(base_url, params=params, headers=headers, timeout=15)
+            if r.status_code != 200:
+                break
+
+            data = r.json()
+            diff = data.get("data", {}).get("diff", [])
+            if not diff:
+                break
+
+            for item in diff:
+                code = str(item.get("f12", ""))
+                name = item.get("f14", "")
+                if not code or not name:
+                    continue
+                if 'ST' in name or '退' in name:
+                    continue
+                if code.startswith('8'):
+                    continue
+                market = 'sh' if code.startswith(('6', '9')) else 'sz'
+                codes.append(market + code)
+
+            total = data.get("data", {}).get("total", 0)
+            if page * page_size >= total:
+                break
+            page += 1
+
+        if codes:
+            return codes
+    except Exception as e:
+        logger.warning(f"东方财富API获取股票列表失败: {e}")
+
+    # 兜底：原有范围枚举
+    logger.info("使用备用方法生成股票代码")
     for i in range(600000, 604000):
         codes.append('sh' + str(i))
-    # 上海科创板 688000-689999
     for i in range(688000, 690000):
         codes.append('sh' + str(i))
-    # 深圳主板 000001-002999
     for i in range(1, 3000):
         codes.append('sz' + str(i).zfill(6))
-    # 深圳创业板 300000-301999
     for i in range(300000, 302000):
         codes.append('sz' + str(i))
     return codes
