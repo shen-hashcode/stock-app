@@ -198,6 +198,7 @@ def get_kline_data(code, market, days=10):
         r = requests.get(QQ_KLINE_URL, params=params, headers=headers, timeout=10)
         if r.status_code != 200:
             return None
+        print('K 线原始响应:', r.text)
 
         match = re.search(r'=(\{.*\})', r.text)
         if not match:
