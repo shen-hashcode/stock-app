@@ -34,7 +34,7 @@ SCHEDULE_HOUR = int(os.getenv("SCHEDULE_HOUR", "8"))
 SCHEDULE_MINUTE = int(os.getenv("SCHEDULE_MINUTE", "30"))
 
 BUILTIN_WARMUP_HOUR = int(os.getenv("BUILTIN_WARMUP_HOUR", "16"))
-BUILTIN_WARMUP_MINUTE = int(os.getenv("BUILTIN_WARMUP_MINUTE", "3"))
+BUILTIN_WARMUP_MINUTE = int(os.getenv("BUILTIN_WARMUP_MINUTE", "23"))
 
 scheduler = BackgroundScheduler()
 
