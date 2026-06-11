@@ -1115,7 +1115,8 @@ def create_subscription_order(
         "code": 0,
         "data": {
             "order_no": order_no,
-            "payment_params": payment_params
+            "payment_params": payment_params,
+            "mock": MOCK_PAY
         }
     }
 

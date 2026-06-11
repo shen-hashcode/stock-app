@@ -50,6 +50,23 @@ Page({
       const params = res.data.payment_params
       const orderNo = res.data.order_no
 
+      if (res.data.mock) {
+        post(`/api/subscription/mock_pay/${orderNo}?user_id=${app.globalData.userId}`).then(mockRes => {
+          if (mockRes.code === 0) {
+            this.setData({ paying: false })
+            wx.showToast({ title: '订阅成功', icon: 'success' })
+            this.loadData()
+          } else {
+            this.setData({ paying: false })
+            wx.showToast({ title: mockRes.message || '支付失败', icon: 'none' })
+          }
+        }).catch(() => {
+          this.setData({ paying: false })
+          wx.showToast({ title: '网络错误', icon: 'none' })
+        })
+        return
+      }
+
       wx.requestPayment({
         timeStamp: params.timeStamp,
         nonceStr: params.nonceStr,
