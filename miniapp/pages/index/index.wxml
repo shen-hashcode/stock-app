@@ -37,58 +37,5 @@
     </view>
   </view>
 
-  <!-- 我的策略区 -->
-  <view class="section" wx:if="{{userStrategies.length > 0}}">
-    <view class="section-header">
-      <view class="section-title">
-        <text class="section-icon">◇</text>
-        <text>我的策略</text>
-      </view>
-      <view class="section-badge">{{userStrategies.length}}个策略</view>
-    </view>
-    <view class="strategy-list">
-      <view class="strategy-item {{runningKey === 'user_' + item.id ? 'running' : ''}}" wx:for="{{userStrategies}}" wx:key="id" bindtap="selectUserStrategy" data-id="{{item.id}}">
-        <view class="strategy-glow"></view>
-        <view class="strategy-name">{{item.name}}</view>
-        <view class="strategy-desc">{{item.description}}</view>
-        <view class="strategy-params" wx:if="{{item.conditions_display && item.conditions_display.length}}">
-          <view class="tag" wx:for="{{item.conditions_display}}" wx:for-item="cond" wx:key="label">
-            {{cond.label}}: {{cond.value}}
-          </view>
-        </view>
-        <view class="strategy-run-hint" wx:if="{{runningKey !== 'user_' + item.id}}">
-          <text class="run-icon">▶</text> 点击执行
-        </view>
-        <view class="strategy-loading" wx:if="{{runningKey === 'user_' + item.id}}">
-          <view class="loading-dot"></view>
-          <view class="loading-dot"></view>
-          <view class="loading-dot"></view>
-        </view>
-      </view>
-    </view>
-  </view>
-
-  <!-- 定制策略区 -->
-  <view class="section ai-section">
-    <view class="section-header">
-      <view class="section-title">
-        <text class="section-icon ai-icon">⚡</text>
-        <text>定制策略</text>
-      </view>
-    </view>
-    <view class="ai-form">
-      <view class="input-group">
-        <view class="input-label">策略名称</view>
-        <input class="input neon-input" placeholder="输入策略名称" placeholder-style="color:#4a5568" bindinput="onNameInput" value="{{customName}}" />
-      </view>
-      <view class="input-group">
-        <view class="input-label">选股条件</view>
-        <textarea class="input neon-input textarea" placeholder="描述你的选股条件，例如：&#10;前3天累计涨幅超过15%，第4天回调，市值大于100亿" placeholder-style="color:#4a5568" bindinput="onDescInput" value="{{customDesc}}" />
-      </view>
-      <view class="btn-primary ai-btn" bindtap="createCustomStrategy">
-        <text class="btn-icon">✦</text> 生成策略
-      </view>
-    </view>
-  </view>
 </view>
 
