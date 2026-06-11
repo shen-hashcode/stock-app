@@ -298,8 +298,7 @@ async def create_custom_strategy(
 
         # 配额检查
         custom_count = db.query(Strategy).filter(
-            Strategy.user_id == user_id,
-            Strategy.conditions.like('%"type": "custom"%')
+            Strategy.user_id == user_id
         ).count()
         if custom_count >= pkg.strategy_limit:
             return {"code": 3, "message": f"当前套餐最多创建{pkg.strategy_limit}个自定义策略，已达上限"}
@@ -308,8 +307,7 @@ async def create_custom_strategy(
         db_strategy = Strategy(
             user_id=user_id,
             name=strategy.name,
-            description=strategy.description,
-            conditions=json.dumps({"type": "custom", "description": strategy.description})
+            description=strategy.description
         )
         db.add(db_strategy)
         db.commit()
@@ -348,8 +346,7 @@ def get_user_strategies(user_id: int, db: Session = Depends(get_db)):
                     "id": 1,
                     "name": "涨幅回调策略",
                     "description": "...",
-                    "conditions": "{...}",
-                    "conditions_display": [{"label": "...", "value": "..."}],
+                    "type": "custom",
                     "is_active": true,
                     ...
                 }
@@ -360,43 +357,7 @@ def get_user_strategies(user_id: int, db: Session = Depends(get_db)):
         小程序策略tab -> 加载策略列表 -> 调用此接口 -> 展示用户策略
     """
     strategies = db.query(Strategy).filter(Strategy.user_id == user_id).all()
-    data = []
-    for s in strategies:
-        item = {
-            "id": s.id,
-            "user_id": s.user_id,
-            "name": s.name,
-            "description": s.description,
-            "conditions": s.conditions,
-            "script_code": s.script_code,
-            "is_active": s.is_active,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
-        }
-        # 解析 conditions 生成前端可展示的条件列表
-        try:
-            cond = json.loads(s.conditions) if s.conditions else {}
-            cond_type = cond.get("type", "")
-            if cond_type == "custom":
-                item["conditions_display"] = [
-                    {"label": "条件描述", "value": cond.get("description", s.description)}
-                ]
-            elif cond_type in STRATEGIES:
-                builtin = STRATEGIES[cond_type]
-                params = cond.get("params", {})
-                display = []
-                for key, meta in builtin["params"].items():
-                    display.append({
-                        "label": meta["label"],
-                        "value": params.get(key, meta["default"])
-                    })
-                item["conditions_display"] = display
-            else:
-                item["conditions_display"] = []
-        except (json.JSONDecodeError, KeyError):
-            item["conditions_display"] = []
-        data.append(item)
-    return {"code": 0, "data": data}
+    return {"code": 0, "data": strategies}
 
 
 # ============================================================
@@ -679,21 +640,13 @@ async def _execute_saved_strategy_background(
         if not strategy:
             return
 
-        conditions = json.loads(strategy.conditions) if strategy.conditions else {}
-        strategy_type = conditions.get("type", "")
-
-        if strategy_type == "custom" and strategy.script_code:
+        if strategy.script_code:
             namespace = {}
             exec(
                 "from stock_service import get_kline_data, get_realtime_quote\n" + strategy.script_code,
                 namespace
             )
             check_func = namespace.get('check_stock')
-        elif strategy_type in STRATEGIES:
-            builtin_strategy = STRATEGIES[strategy_type]
-            params = {k: v.get("default") for k, v in builtin_strategy["params"].items()}
-            params.update(conditions.get("params", {}))
-            check_func = lambda stock, func=builtin_strategy["func"], p=params: func(stock, **p)
         else:
             return
 
@@ -1078,8 +1031,7 @@ def get_subscription_status(user_id: int, db: Session = Depends(get_db)):
         }
 
     custom_count = db.query(Strategy).filter(
-        Strategy.user_id == user_id,
-        Strategy.conditions.like('%"type": "custom"%')
+        Strategy.user_id == user_id
     ).count()
 
     return {

@@ -110,7 +110,7 @@ python main.py
 users (id, openid, nickname, phone, created_at, is_active)
 
 -- 策略表
-strategies (id, user_id, name, description, conditions, script_code, is_active, created_at, updated_at)
+strategies (id, user_id, name, description, script_code, is_active, created_at, updated_at)
 
 -- 结果表
 strategy_results (id, strategy_id, run_date, stocks_json, created_at)

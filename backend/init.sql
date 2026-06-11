@@ -2,11 +2,6 @@
 -- 智能选股助手 - 数据库初始化脚本 (MySQL)
 -- ========================================
 --
--- JSON字段格式说明:
---   strategies.conditions:
---     内置策略: {"type":"rise_pullback","params":{"days":3,"rise_pct":13}}
---     自定义策略: {"type":"custom","description":"前3天涨幅超15%"}
---
 --   strategy_results.stocks_json:
 --     [{"code":"600519","name":"贵州茅台","market":"sh","quote":{"price":1680,"change_pct":1.25}}]
 --
@@ -38,8 +33,7 @@ CREATE TABLE IF NOT EXISTS strategies (
     user_id INT NOT NULL COMMENT '所属用户ID，关联users表',
     name VARCHAR(100) COMMENT '策略名称',
     description TEXT COMMENT '策略描述说明',
-    conditions TEXT COMMENT '策略条件，JSON格式存储',
-    script_code TEXT COMMENT 'AI生成的Python脚本代码（自定义策略专用）',
+    script_code TEXT COMMENT 'AI生成的Python脚本代码',
     is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用：1=启用, 0=禁用',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，修改时自动更新',

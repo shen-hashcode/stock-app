@@ -124,19 +124,13 @@ class Strategy(Base):
     策略表 (strategies)
     
     存储用户创建的选股策略
-    支持两种类型:
-    1. 内置策略实例：用户选择内置策略并配置参数
-    2. AI自定义策略：用户用自然语言描述，AI生成Python脚本
     
     字段说明:
         id: 主键，自增
         user_id: 外键，关联users表
         name: 策略名称
         description: 策略描述
-        conditions: 策略条件（JSON格式）
-            - 内置策略: {"type": "rise_pullback", "params": {"days": 3, ...}}
-            - 自定义策略: {"type": "custom", "description": "..."}
-        script_code: AI生成的Python脚本代码（仅自定义策略）
+        script_code: AI生成的Python脚本代码
         is_active: 是否启用
         created_at: 创建时间
         updated_at: 更新时间（自动更新）
@@ -159,11 +153,7 @@ class Strategy(Base):
     # 策略描述
     description = Column(Text)
     
-    # 策略条件（JSON格式）
-    # 示例: {"type": "rise_pullback", "params": {"days": 3, "rise_pct": 13}}
-    conditions = Column(Text)
-    
-    # AI生成的Python脚本代码（仅自定义策略使用）
+    # AI生成的Python脚本代码
     # 脚本需定义 check_stock(stock_info) 函数
     script_code = Column(Text)
     

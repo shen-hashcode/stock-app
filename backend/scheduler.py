@@ -70,25 +70,16 @@ def daily_strategy_run():
             try:
                 logger.info(f"执行策略: {strategy.name} (ID: {strategy.id})")
 
-                conditions = json.loads(strategy.conditions) if strategy.conditions else {}
-                strategy_type = conditions.get("type", "")
-
-                if strategy_type == "custom" and strategy.script_code:
-                    # AI/人工自定义策略：动态执行脚本拿 check_stock
+                if strategy.script_code:
+                    # 动态执行脚本拿 check_stock
                     namespace = {}
                     exec(
                         "from stock_service import get_kline_data, get_realtime_quote\n" + strategy.script_code,
                         namespace,
                     )
                     check_func = namespace.get('check_stock')
-                elif strategy_type in all_builtin:
-                    # 内置策略：用 func + 默认参数 + 用户覆盖参数
-                    builtin = all_builtin[strategy_type]
-                    params = {k: v.get("default") for k, v in builtin["params"].items()}
-                    params.update(conditions.get("params", {}))
-                    check_func = lambda stock, func=builtin["func"], p=params: func(stock, **p)
                 else:
-                    logger.warning(f"未知策略类型 {strategy_type}，跳过 (策略 {strategy.id})")
+                    logger.warning(f"策略 {strategy.id} 无脚本代码，跳过")
                     continue
 
                 results = []
