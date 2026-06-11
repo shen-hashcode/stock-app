@@ -349,6 +349,7 @@ def get_user_strategies(user_id: int, db: Session = Depends(get_db)):
                     "name": "涨幅回调策略",
                     "description": "...",
                     "conditions": "{...}",
+                    "conditions_display": [{"label": "...", "value": "..."}],
                     "is_active": true,
                     ...
                 }
@@ -359,7 +360,43 @@ def get_user_strategies(user_id: int, db: Session = Depends(get_db)):
         小程序策略tab -> 加载策略列表 -> 调用此接口 -> 展示用户策略
     """
     strategies = db.query(Strategy).filter(Strategy.user_id == user_id).all()
-    return {"code": 0, "data": strategies}
+    data = []
+    for s in strategies:
+        item = {
+            "id": s.id,
+            "user_id": s.user_id,
+            "name": s.name,
+            "description": s.description,
+            "conditions": s.conditions,
+            "script_code": s.script_code,
+            "is_active": s.is_active,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        }
+        # 解析 conditions 生成前端可展示的条件列表
+        try:
+            cond = json.loads(s.conditions) if s.conditions else {}
+            cond_type = cond.get("type", "")
+            if cond_type == "custom":
+                item["conditions_display"] = [
+                    {"label": "条件描述", "value": cond.get("description", s.description)}
+                ]
+            elif cond_type in STRATEGIES:
+                builtin = STRATEGIES[cond_type]
+                params = cond.get("params", {})
+                display = []
+                for key, meta in builtin["params"].items():
+                    display.append({
+                        "label": meta["label"],
+                        "value": params.get(key, meta["default"])
+                    })
+                item["conditions_display"] = display
+            else:
+                item["conditions_display"] = []
+        except (json.JSONDecodeError, KeyError):
+            item["conditions_display"] = []
+        data.append(item)
+    return {"code": 0, "data": data}
 
 
 # ============================================================

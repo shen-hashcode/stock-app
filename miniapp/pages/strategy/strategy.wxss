@@ -101,6 +101,12 @@ page {
   margin: 24rpx 0;
 }
 
+.strategy-params {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+}
+
 .strategy-actions {
   display: flex;
   gap: 20rpx;

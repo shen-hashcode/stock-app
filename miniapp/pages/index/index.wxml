@@ -51,6 +51,11 @@
         <view class="strategy-glow"></view>
         <view class="strategy-name">{{item.name}}</view>
         <view class="strategy-desc">{{item.description}}</view>
+        <view class="strategy-params" wx:if="{{item.conditions_display && item.conditions_display.length}}">
+          <view class="tag" wx:for="{{item.conditions_display}}" wx:for-item="cond" wx:key="label">
+            {{cond.label}}: {{cond.value}}
+          </view>
+        </view>
         <view class="strategy-run-hint" wx:if="{{runningKey !== 'user_' + item.id}}">
           <text class="run-icon">▶</text> 点击执行
         </view>
