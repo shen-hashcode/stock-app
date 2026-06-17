@@ -33,9 +33,13 @@ APPID = os.getenv("WECHAT_APPID", "")
 
 # 微信支付API地址
 JSAPI_ORDER_URL = "https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi"
+CERT_DOWNLOAD_URL = "https://api.mch.weixin.qq.com/v3/certificates"
 
 # 缓存商户私钥
 _private_key = None
+
+# 平台证书缓存 {serial_no: {"cert": Certificate, "expire_time": str}}
+_platform_certs = {}
 
 
 def _load_private_key():
@@ -171,13 +175,53 @@ def build_payment_params(prepay_id: str) -> dict:
     }
 
 
-def verify_callback_signature(headers: dict, body: bytes) -> bool:
-    """
-    验证微信支付回调的签名
+def _download_platform_certs() -> bool:
+    """从微信支付API下载平台证书并缓存"""
+    url_path = "/v3/certificates"
+    auth_header = _build_auth_header("GET", url_path)
 
-    注意：完整实现需要下载微信支付平台证书进行验证
-    这里做基本的格式校验，生产环境应实现完整的证书验签
-    """
+    try:
+        resp = requests.get(
+            CERT_DOWNLOAD_URL,
+            headers={"Authorization": auth_header},
+            timeout=10
+        )
+        if resp.status_code != 200:
+            logger.error(f"下载平台证书失败: {resp.status_code} {resp.text}")
+            return False
+
+        data = resp.json()
+        for cert_info in data.get("data", []):
+            serial_no = cert_info.get("serial_no")
+            resource = cert_info.get("encrypt_certificate", {})
+            cert_pem = _decrypt_certificate(resource)
+            if cert_pem:
+                from cryptography.x509 import load_pem_x509_certificate
+                cert = load_pem_x509_certificate(cert_pem.encode("utf-8"))
+                _platform_certs[serial_no] = {
+                    "cert": cert,
+                    "expire_time": cert_info.get("expire_time", "")
+                }
+                logger.info(f"缓存平台证书: serial_no={serial_no}")
+
+        return True
+    except Exception as e:
+        logger.error(f"下载平台证书异常: {e}")
+        return False
+
+
+def _get_platform_cert(serial_no: str):
+    """获取指定序列号的平台证书，缓存不存在则自动下载"""
+    if serial_no not in _platform_certs:
+        logger.info(f"平台证书未缓存，尝试下载: serial_no={serial_no}")
+        if not _download_platform_certs():
+            return None
+    cert_info = _platform_certs.get(serial_no)
+    return cert_info["cert"] if cert_info else None
+
+
+def verify_callback_signature(headers: dict, body: bytes) -> bool:
+    """验证微信支付回调签名（使用微信平台证书RSA-SHA256验签）"""
     timestamp = headers.get("Wechatpay-Timestamp", "")
     nonce = headers.get("Wechatpay-Nonce", "")
     signature = headers.get("Wechatpay-Signature", "")
@@ -187,9 +231,24 @@ def verify_callback_signature(headers: dict, body: bytes) -> bool:
         logger.warning("回调缺少签名头")
         return False
 
-    # TODO: 生产环境需要用微信平台公钥验证签名
-    # 此处先返回True，确保流程跑通后再补全验签逻辑
-    return True
+    cert = _get_platform_cert(serial)
+    if not cert:
+        logger.error(f"无法获取平台证书: serial={serial}")
+        return False
+
+    sign_str = f"{timestamp}\n{nonce}\n{body.decode('utf-8')}\n"
+    try:
+        public_key = cert.public_key()
+        public_key.verify(
+            base64.b64decode(signature),
+            sign_str.encode("utf-8"),
+            PKCS1v15(),
+            SHA256()
+        )
+        return True
+    except Exception as e:
+        logger.error(f"回调签名验证失败: {e}")
+        return False
 
 
 def decrypt_callback_data(resource: dict) -> dict:
