@@ -75,9 +75,8 @@ CREATE TABLE IF NOT EXISTS subscription_packages (
 
 -- 初始套餐数据
 INSERT INTO subscription_packages (name, description, price_cents, duration_days, strategy_limit, sort_order) VALUES
-('体验版', '入门体验，可创建1个自定义策略', 990, 30, 1, 1),
-('基础版', '适合个人投资者，可创建3个自定义策略', 2900, 30, 3, 2),
-('专业版', '专业投资者，可创建10个自定义策略', 5900, 30, 10, 3);
+('内置策略套餐', '查看每日热门策略结果，不可创建自定义策略', 990, 30, 0, 1),
+('定制策略套餐', '可创建1个自定义策略，同时可查看每日热门策略结果', 2990, 30, 1, 2);
 
 -- ----------------------------------------
 -- 用户订阅记录表：记录用户的订阅订单

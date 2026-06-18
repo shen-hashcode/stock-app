@@ -5,7 +5,8 @@
     <view class="status-info">
       <text class="pkg-name">{{subscription.package_name}}</text>
       <text class="expire-text">到期时间: {{subscription.expired_at}}</text>
-      <text class="quota-text">策略配额: {{subscription.strategies_used}}/{{subscription.strategy_limit}}</text>
+      <text class="quota-text" wx:if="{{subscription.strategy_limit > 0}}">策略配额: {{subscription.strategies_used}}/{{subscription.strategy_limit}}</text>
+      <text class="quota-text" wx:else>查看热门策略结果</text>
     </view>
   </view>
 
@@ -31,7 +32,8 @@
       <view class="package-desc">{{item.description}}</view>
       <view class="package-detail">
         <text>有效期: {{item.duration_days}}天</text>
-        <text>策略上限: {{item.strategy_limit}}个</text>
+        <text wx:if="{{item.strategy_limit > 0}}">策略上限: {{item.strategy_limit}}个</text>
+        <text wx:else>不可创建自定义策略</text>
       </view>
       <button
         class="buy-btn"
