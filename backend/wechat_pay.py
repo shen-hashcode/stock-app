@@ -53,8 +53,12 @@ def _load_private_key():
             logger.error(f"商户私钥文件不存在: {MCH_PRIVATE_KEY_PATH}")
         return None
 
-    with open(MCH_PRIVATE_KEY_PATH, "rb") as f:
-        _private_key = load_pem_private_key(f.read(), password=None)
+    try:
+        with open(MCH_PRIVATE_KEY_PATH, "rb") as f:
+            _private_key = load_pem_private_key(f.read(), password=None)
+    except Exception as e:
+        logger.error(f"加载商户私钥失败: {e}")
+        _private_key = None
     return _private_key
 
 
@@ -114,7 +118,7 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
         "mchid": MCH_ID,
         "description": description,
         "out_trade_no": order_no,
-        # "notify_url": PAY_NOTIFY_URL,
+        "notify_url": PAY_NOTIFY_URL,
         "amount": {
             "total": amount_cents,
             "currency": "CNY"
