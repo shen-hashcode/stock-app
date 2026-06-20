@@ -83,13 +83,12 @@ Page({
         signType: params.signType,
         paySign: params.paySign,
         success: () => {
-          this.pollOrderStatus(orderNo)
+          this.pollOrderStatus(orderNo, false)
         },
         fail: (err) => {
-          this.setData({ paying: false })
           console.error('wx.requestPayment 失败:', JSON.stringify(err))
-          const msg = (err && err.errMsg) || '支付失败'
-          wx.showToast({ title: msg, icon: 'none', duration: 3000 })
+          wx.showLoading({ title: '重新获取支付信息...' })
+          this.pollOrderStatus(orderNo, true)
         }
       })
     }).catch((err) => {
@@ -100,7 +99,7 @@ Page({
     })
   },
 
-  pollOrderStatus(orderNo) {
+  pollOrderStatus(orderNo, retryPayment) {
     let retries = 0
     const maxRetries = 10
 
@@ -110,7 +109,48 @@ Page({
           this.setData({ paying: false })
           wx.showToast({ title: '订阅成功', icon: 'success' })
           this.loadData()
-        } else if (retries < maxRetries) {
+          return
+        }
+
+        // 如果要求重试支付且有可用的支付参数，重新拉起微信支付
+        if (retryPayment && res.code === 0 && res.data.payment_params) {
+          const params = res.data.payment_params
+          if (res.data.mock) {
+            post(`/api/subscription/mock_pay/${orderNo}?user_id=${app.globalData.userId}`).then(mockRes => {
+              if (mockRes.code === 0) {
+                this.setData({ paying: false })
+                wx.showToast({ title: '订阅成功', icon: 'success' })
+                this.loadData()
+              } else {
+                this.setData({ paying: false })
+                wx.showToast({ title: mockRes.message || '支付失败', icon: 'none', duration: 3000 })
+              }
+            }).catch(() => {
+              this.setData({ paying: false })
+              wx.showToast({ title: '网络错误', icon: 'none' })
+            })
+            return
+          }
+
+          wx.requestPayment({
+            timeStamp: params.timeStamp,
+            nonceStr: params.nonceStr,
+            package: params.package,
+            signType: params.signType,
+            paySign: params.paySign,
+            success: () => {
+              this.pollOrderStatus(orderNo, false)
+            },
+            fail: (err) => {
+              this.setData({ paying: false })
+              const msg = (err && err.errMsg) || '支付失败'
+              wx.showToast({ title: msg, icon: 'none', duration: 3000 })
+            }
+          })
+          return
+        }
+
+        if (retries < maxRetries) {
           retries++
           setTimeout(check, 1500)
         } else {

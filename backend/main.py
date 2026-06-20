@@ -1097,8 +1097,13 @@ def create_subscription_order(
     if "error" in result:
         return {"code": 1, "message": result["error"]}
 
+    # 存储prepay_id，以便后续重新拉起支付
+    prepay_id = result["prepay_id"]
+    subscription.prepay_id = prepay_id
+    db.commit()
+
     # 生成前端支付参数
-    payment_params = build_payment_params(result["prepay_id"])
+    payment_params = build_payment_params(prepay_id)
 
     return {
         "code": 0,
@@ -1112,7 +1117,7 @@ def create_subscription_order(
 
 @app.get("/api/subscription/order/{order_no}")
 def query_order_status(order_no: str, user_id: int, db: Session = Depends(get_db)):
-    """查询订单状态（前端支付后轮询）"""
+    """查询订单状态（前端支付后轮询 / 重新拉起支付）"""
     sub = db.query(UserSubscription).filter(
         UserSubscription.order_no == order_no,
         UserSubscription.user_id == user_id
@@ -1121,13 +1126,18 @@ def query_order_status(order_no: str, user_id: int, db: Session = Depends(get_db
     if not sub:
         return {"code": 1, "message": "订单不存在"}
 
-    return {
-        "code": 0,
-        "data": {
-            "status": sub.status,
-            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None
-        }
+    data = {
+        "status": sub.status,
+        "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S") if sub.expired_at else None
     }
+
+    # 如果订单处于待支付状态且有prepay_id，返回支付参数以便重新拉起微信支付
+    if sub.status == "pending" and sub.prepay_id:
+        from wechat_pay import build_payment_params, MOCK_PAY
+        data["payment_params"] = build_payment_params(sub.prepay_id)
+        data["mock"] = MOCK_PAY
+
+    return {"code": 0, "data": data}
 
 
 @app.post("/api/subscription/mock_pay/{order_no}")

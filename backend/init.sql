@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     user_id INT NOT NULL COMMENT '用户ID',
     package_id INT NOT NULL COMMENT '套餐ID',
     order_no VARCHAR(64) UNIQUE NOT NULL COMMENT '系统订单号',
+    prepay_id VARCHAR(128) COMMENT '微信预支付ID，用于重新拉起支付',
     transaction_id VARCHAR(64) COMMENT '微信支付交易号',
     amount_cents INT NOT NULL COMMENT '实付金额（单位：分）',
     status VARCHAR(20) DEFAULT 'pending' COMMENT '状态：pending/paid/expired/refunded',

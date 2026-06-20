@@ -263,6 +263,7 @@ class UserSubscription(Base):
     user_id = Column(Integer, index=True)
     package_id = Column(Integer, index=True)
     order_no = Column(String(64), unique=True, index=True)
+    prepay_id = Column(String(128))
     transaction_id = Column(String(64))
     amount_cents = Column(Integer)
     status = Column(String(20), default="pending")
