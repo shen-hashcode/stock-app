@@ -76,9 +76,10 @@ Page({
         success: () => {
           this.pollOrderStatus(orderNo)
         },
-        fail: () => {
+        fail: (err) => {
           this.setData({ paying: false })
-          wx.showToast({ title: '支付取消', icon: 'none' })
+          const msg = (err && err.errMsg) || '支付失败'
+          wx.showToast({ title: msg, icon: 'none', duration: 3000 })
         }
       })
     }).catch(() => {
