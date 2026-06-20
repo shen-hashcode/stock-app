@@ -134,6 +134,7 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
             },
             timeout=10
         )
+        logger.info(f"微信下单: {resp.text}")
 
         if resp.status_code == 200:
             data = resp.json()
