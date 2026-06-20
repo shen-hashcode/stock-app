@@ -10,6 +10,7 @@ Page({
   },
 
   onShow() {
+    if (!app.checkLogin()) return
     this.loadData()
   },
 
@@ -32,6 +33,13 @@ Page({
 
   buyPackage(e) {
     if (this.data.paying) return
+
+    if (!app.globalData.userId) {
+      wx.showToast({ title: '请先登录', icon: 'none' })
+      wx.redirectTo({ url: '/pages/login/login' })
+      return
+    }
+
     const packageId = e.currentTarget.dataset.id
 
     this.setData({ paying: true })
@@ -43,7 +51,7 @@ Page({
       wx.hideLoading()
       if (res.code !== 0) {
         this.setData({ paying: false })
-        wx.showToast({ title: res.message || '创建订单失败', icon: 'none' })
+        wx.showToast({ title: res.message || '创建订单失败', icon: 'none', duration: 3000 })
         return
       }
 
@@ -58,7 +66,7 @@ Page({
             this.loadData()
           } else {
             this.setData({ paying: false })
-            wx.showToast({ title: mockRes.message || '支付失败', icon: 'none' })
+            wx.showToast({ title: mockRes.message || '支付失败', icon: 'none', duration: 3000 })
           }
         }).catch(() => {
           this.setData({ paying: false })
@@ -67,6 +75,7 @@ Page({
         return
       }
 
+      console.log('wx.requestPayment params:', JSON.stringify(params))
       wx.requestPayment({
         timeStamp: params.timeStamp,
         nonceStr: params.nonceStr,
@@ -78,14 +87,16 @@ Page({
         },
         fail: (err) => {
           this.setData({ paying: false })
+          console.error('wx.requestPayment 失败:', JSON.stringify(err))
           const msg = (err && err.errMsg) || '支付失败'
           wx.showToast({ title: msg, icon: 'none', duration: 3000 })
         }
       })
-    }).catch(() => {
+    }).catch((err) => {
       wx.hideLoading()
       this.setData({ paying: false })
-      wx.showToast({ title: '网络错误', icon: 'none' })
+      console.error('创建订单失败:', err)
+      wx.showToast({ title: '网络错误，请检查是否开启了"不校验合法域名"', icon: 'none', duration: 3000 })
     })
   },
 
