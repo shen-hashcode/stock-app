@@ -1069,8 +1069,7 @@ def create_subscription_order(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return {"code": 1, "message": "用户不存在"}
-    from wechat_pay import MOCK_PAY
-    if not MOCK_PAY and (not user.openid or user.openid.startswith("phone_")):
+    if not user.openid or user.openid.startswith("phone_"):
         return {"code": 1, "message": "微信支付需要微信授权登录"}
 
     # 生成订单
@@ -1109,8 +1108,7 @@ def create_subscription_order(
         "code": 0,
         "data": {
             "order_no": order_no,
-            "payment_params": payment_params,
-            "mock": MOCK_PAY
+            "payment_params": payment_params
         }
     }
 
@@ -1133,51 +1131,10 @@ def query_order_status(order_no: str, user_id: int, db: Session = Depends(get_db
 
     # 如果订单处于待支付状态且有prepay_id，返回支付参数以便重新拉起微信支付
     if sub.status == "pending" and sub.prepay_id:
-        from wechat_pay import build_payment_params, MOCK_PAY
+        from wechat_pay import build_payment_params
         data["payment_params"] = build_payment_params(sub.prepay_id)
-        data["mock"] = MOCK_PAY
 
     return {"code": 0, "data": data}
-
-
-@app.post("/api/subscription/mock_pay/{order_no}")
-def mock_pay_order(order_no: str, user_id: int, db: Session = Depends(get_db)):
-    """模拟支付：将指定订单直接标记为已支付（仅 MOCK_PAY=true 时可用）"""
-    from wechat_pay import MOCK_PAY
-    if not MOCK_PAY:
-        return {"code": 1, "message": "模拟支付未启用，请设置 MOCK_PAY=true"}
-
-    sub = db.query(UserSubscription).filter(
-        UserSubscription.order_no == order_no,
-        UserSubscription.user_id == user_id
-    ).first()
-    if not sub:
-        return {"code": 1, "message": "订单不存在"}
-    if sub.status != "pending":
-        return {"code": 1, "message": f"订单状态不是待支付: {sub.status}"}
-
-    pkg = db.query(SubscriptionPackage).filter(
-        SubscriptionPackage.id == sub.package_id
-    ).first()
-    if not pkg:
-        return {"code": 1, "message": "套餐不存在"}
-
-    now = datetime.now()
-    sub.status = "paid"
-    sub.transaction_id = f"mock_transaction_{order_no}"
-    sub.paid_at = now
-    sub.started_at = now
-    sub.expired_at = now + timedelta(days=pkg.duration_days)
-    db.commit()
-
-    logger.info(f"模拟支付成功: 用户{sub.user_id}, 套餐{pkg.name}, 订单{order_no}")
-    return {
-        "code": 0,
-        "data": {
-            "status": "paid",
-            "expired_at": sub.expired_at.strftime("%Y-%m-%d %H:%M:%S")
-        }
-    }
 
 
 @app.post("/api/pay/callback")

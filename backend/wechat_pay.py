@@ -23,7 +23,6 @@ import requests
 from logger import logger
 
 # 微信支付配置
-MOCK_PAY = os.getenv("MOCK_PAY", "").lower() in ("true", "1", "yes")
 MCH_ID = os.getenv("WECHAT_MCH_ID", "")
 API_KEY_V3 = os.getenv("WECHAT_API_KEY_V3", "")
 MCH_SERIAL_NO = os.getenv("WECHAT_MCH_SERIAL_NO", "")
@@ -49,8 +48,7 @@ def _load_private_key():
         return _private_key
 
     if not MCH_PRIVATE_KEY_PATH or not os.path.exists(MCH_PRIVATE_KEY_PATH):
-        if not MOCK_PAY:
-            logger.error(f"商户私钥文件不存在: {MCH_PRIVATE_KEY_PATH}")
+        logger.error(f"商户私钥文件不存在: {MCH_PRIVATE_KEY_PATH}")
         return None
 
     try:
@@ -102,14 +100,8 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
     """
     调用微信JSAPI统一下单接口
 
-    当 MOCK_PAY=true 时跳过真实API调用，返回模拟 prepay_id。
     返回: {"prepay_id": "..."} 或 {"error": "..."}
     """
-    if MOCK_PAY:
-        mock_id = f"mock_prepay_id_{order_no}_{uuid.uuid4().hex[:16]}"
-        logger.info(f"模拟支付: 订单={order_no}, mock_prepay_id={mock_id}")
-        return {"prepay_id": mock_id}
-
     if not all([MCH_ID, API_KEY_V3, MCH_SERIAL_NO, APPID]):
         return {"error": "微信支付配置不完整，请检查环境变量"}
 
@@ -157,18 +149,12 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
 def build_payment_params(prepay_id: str) -> dict:
     """
     生成前端 wx.requestPayment 所需的参数（含签名）
-
-    当 MOCK_PAY=true 且无法加载商户私钥时，使用模拟签名。
     """
     timestamp = str(int(time.time()))
     nonce_str = uuid.uuid4().hex
     package = f"prepay_id={prepay_id}"
-
-    if MOCK_PAY and not _load_private_key():
-        pay_sign = base64.b64encode(f"mock_sign_{timestamp}_{nonce_str}".encode()).decode()
-    else:
-        sign_str = f"{APPID}\n{timestamp}\n{nonce_str}\n{package}\n"
-        pay_sign = _sign(sign_str)
+    sign_str = f"{APPID}\n{timestamp}\n{nonce_str}\n{package}\n"
+    pay_sign = _sign(sign_str)
 
     return {
         "timeStamp": timestamp,

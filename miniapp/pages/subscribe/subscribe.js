@@ -58,23 +58,6 @@ Page({
       const params = res.data.payment_params
       const orderNo = res.data.order_no
 
-      if (res.data.mock) {
-        post(`/api/subscription/mock_pay/${orderNo}?user_id=${app.globalData.userId}`).then(mockRes => {
-          if (mockRes.code === 0) {
-            this.setData({ paying: false })
-            wx.showToast({ title: '订阅成功', icon: 'success' })
-            this.loadData()
-          } else {
-            this.setData({ paying: false })
-            wx.showToast({ title: mockRes.message || '支付失败', icon: 'none', duration: 3000 })
-          }
-        }).catch(() => {
-          this.setData({ paying: false })
-          wx.showToast({ title: '网络错误', icon: 'none' })
-        })
-        return
-      }
-
       console.log('wx.requestPayment params:', JSON.stringify(params))
       wx.requestPayment({
         timeStamp: params.timeStamp,
@@ -115,22 +98,6 @@ Page({
         // 如果要求重试支付且有可用的支付参数，重新拉起微信支付
         if (retryPayment && res.code === 0 && res.data.payment_params) {
           const params = res.data.payment_params
-          if (res.data.mock) {
-            post(`/api/subscription/mock_pay/${orderNo}?user_id=${app.globalData.userId}`).then(mockRes => {
-              if (mockRes.code === 0) {
-                this.setData({ paying: false })
-                wx.showToast({ title: '订阅成功', icon: 'success' })
-                this.loadData()
-              } else {
-                this.setData({ paying: false })
-                wx.showToast({ title: mockRes.message || '支付失败', icon: 'none', duration: 3000 })
-              }
-            }).catch(() => {
-              this.setData({ paying: false })
-              wx.showToast({ title: '网络错误', icon: 'none' })
-            })
-            return
-          }
 
           wx.requestPayment({
             timeStamp: params.timeStamp,
