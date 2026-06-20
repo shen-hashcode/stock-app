@@ -106,7 +106,7 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
         logger.info(f"模拟支付: 订单={order_no}, mock_prepay_id={mock_id}")
         return {"prepay_id": mock_id}
 
-    if not all([MCH_ID, API_KEY_V3, MCH_SERIAL_NO, APPID, PAY_NOTIFY_URL]):
+    if not all([MCH_ID, API_KEY_V3, MCH_SERIAL_NO, APPID]):
         return {"error": "微信支付配置不完整，请检查环境变量"}
 
     body = {
@@ -114,7 +114,7 @@ def create_prepay_order(order_no: str, amount_cents: int, description: str, open
         "mchid": MCH_ID,
         "description": description,
         "out_trade_no": order_no,
-        "notify_url": PAY_NOTIFY_URL,
+        # "notify_url": PAY_NOTIFY_URL,
         "amount": {
             "total": amount_cents,
             "currency": "CNY"
