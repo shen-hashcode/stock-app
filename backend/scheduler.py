@@ -168,7 +168,7 @@ def warmup_builtin_strategies():
                         "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     }
                     try:
-                        ttl = get_ttl_seconds()
+                        ttl = 86400
                         asyncio.run(redis.set(
                             cache_key, json.dumps(result_data, ensure_ascii=False), ex=ttl,
                         ))

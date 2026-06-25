@@ -772,31 +772,6 @@ async def get_user_results_by_date(
 
     result_list = []
 
-    # 内置策略：按 _strategy_key 去重（保留最新一条）
-    seen_builtin_keys = set()
-    for r in builtin_results:
-        try:
-            meta = json.loads(r.stocks_json) if r.stocks_json else {}
-            if not (isinstance(meta, dict) and "_strategy_key" in meta):
-                continue
-            strategy_key = meta["_strategy_key"]
-            if strategy_key in seen_builtin_keys:
-                continue
-            seen_builtin_keys.add(strategy_key)
-            strategy_info = STRATEGIES.get(strategy_key, {})
-            result_list.append({
-                "id": r.id,
-                "type": "builtin",
-                "strategy_key": strategy_key,
-                "strategy_name": strategy_info.get("name", strategy_key),
-                "run_date": r.run_date,
-                "stocks": meta.get("stocks", []),
-                "count": len(meta.get("stocks", [])),
-                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
-            })
-        except (json.JSONDecodeError, AttributeError):
-            continue
-
     # 用户自定义策略：按 strategy_id 去重（保留最新一条）
     seen_custom_ids = set()
     for r in user_results:
@@ -818,6 +793,31 @@ async def get_user_results_by_date(
                 "run_date": r.run_date,
                 "stocks": stocks if isinstance(stocks, list) else [],
                 "count": len(stocks) if isinstance(stocks, list) else 0,
+                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+            })
+        except (json.JSONDecodeError, AttributeError):
+            continue
+
+    # 内置策略：按 _strategy_key 去重（保留最新一条）
+    seen_builtin_keys = set()
+    for r in builtin_results:
+        try:
+            meta = json.loads(r.stocks_json) if r.stocks_json else {}
+            if not (isinstance(meta, dict) and "_strategy_key" in meta):
+                continue
+            strategy_key = meta["_strategy_key"]
+            if strategy_key in seen_builtin_keys:
+                continue
+            seen_builtin_keys.add(strategy_key)
+            strategy_info = STRATEGIES.get(strategy_key, {})
+            result_list.append({
+                "id": r.id,
+                "type": "builtin",
+                "strategy_key": strategy_key,
+                "strategy_name": strategy_info.get("name", strategy_key),
+                "run_date": r.run_date,
+                "stocks": meta.get("stocks", []),
+                "count": len(meta.get("stocks", [])),
                 "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
             })
         except (json.JSONDecodeError, AttributeError):
