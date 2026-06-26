@@ -273,7 +273,7 @@ def strategy_steady_rise(stock_info, days=6, min_pct=0, max_pct=3, market_cap_mi
     return True
 
 
-def strategy_nine_turns(stock_info, direction="down", market_cap_min=50):
+def strategy_nine_turns(stock_info, direction="down"):
     """
     策略7: 神奇九转
 
@@ -286,16 +286,11 @@ def strategy_nine_turns(stock_info, direction="down", market_cap_min=50):
     参数:
         stock_info: 股票信息字典
         direction: 九转方向，"down"=下跌九转(底部信号)，"up"=上涨九转(顶部信号)
-        market_cap_min: 最低市值(亿)，默认50亿
 
     返回: bool - 符合条件返回True
     """
     code = stock_info['code']
     market = stock_info['market']
-    market_cap = stock_info['market_cap']
-
-    if market_cap < market_cap_min:
-        return False
 
     klines = get_kline_data(code, market, days=13)
     if not klines or len(klines) < 13:
@@ -402,8 +397,7 @@ STRATEGIES = {
         "description": "连续9天收盘价低于（或高于）4天前收盘价，预示趋势反转",
         "func": strategy_nine_turns,
         "params": {
-            "direction": {"type": "str", "default": "down", "label": "九转方向(down=下跌九转/up=上涨九转)"},
-            "market_cap_min": {"type": "float", "default": 50, "label": "最低市值(亿)"}
+            "direction": {"type": "str", "default": "down", "label": "九转方向(down=下跌九转/up=上涨九转)"}
         }
     }
 }
