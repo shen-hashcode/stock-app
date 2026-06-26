@@ -1,5 +1,5 @@
 """
-内置选股策略集合（6 个：涨幅回调 / 放量突破 / 均线金叉 / 连续上涨 / 涨停开板 / 稳步上涨）。
+内置选股策略集合（7 个：涨幅回调 / 放量突破 / 均线金叉 / 连续上涨 / 涨停开板 / 稳步上涨 / 神奇九转）。
 
 每个策略函数接收股票元信息字典，返回 True/False 表示是否符合条件。
 
@@ -273,6 +273,49 @@ def strategy_steady_rise(stock_info, days=6, min_pct=0, max_pct=3, market_cap_mi
     return True
 
 
+def strategy_nine_turns(stock_info, direction="down", market_cap_min=50):
+    """
+    策略7: 神奇九转
+
+    逻辑: 最近9个交易日，每日收盘价均低于（或高于）4天前的收盘价，
+          形成TD Sequential结构9，预示趋势衰竭反转。
+
+    下跌九转(down): 连续9天收盘价 < 4天前收盘价 → 潜在底部买入信号
+    上涨九转(up):   连续9天收盘价 > 4天前收盘价 → 潜在顶部卖出信号
+
+    参数:
+        stock_info: 股票信息字典
+        direction: 九转方向，"down"=下跌九转(底部信号)，"up"=上涨九转(顶部信号)
+        market_cap_min: 最低市值(亿)，默认50亿
+
+    返回: bool - 符合条件返回True
+    """
+    code = stock_info['code']
+    market = stock_info['market']
+    market_cap = stock_info['market_cap']
+
+    if market_cap < market_cap_min:
+        return False
+
+    klines = get_kline_data(code, market, days=13)
+    if not klines or len(klines) < 13:
+        return False
+
+    recent = klines[-13:]
+
+    for i in range(9):
+        curr_close = recent[12 - i]['close']
+        prev_close = recent[8 - i]['close']
+        if direction == "up":
+            if curr_close <= prev_close:
+                return False
+        else:
+            if curr_close >= prev_close:
+                return False
+
+    return True
+
+
 """
 策略注册表
 
@@ -351,6 +394,15 @@ STRATEGIES = {
             "days": {"type": "int", "default": 6, "label": "交易日天数"},
             "min_pct": {"type": "float", "default": 0, "label": "最小涨幅(%)"},
             "max_pct": {"type": "float", "default": 3, "label": "最大涨幅(%)"},
+            "market_cap_min": {"type": "float", "default": 50, "label": "最低市值(亿)"}
+        }
+    },
+    "nine_turns": {
+        "name": "神奇九转",
+        "description": "连续9天收盘价低于（或高于）4天前收盘价，预示趋势反转",
+        "func": strategy_nine_turns,
+        "params": {
+            "direction": {"type": "str", "default": "down", "label": "九转方向(down=下跌九转/up=上涨九转)"},
             "market_cap_min": {"type": "float", "default": 50, "label": "最低市值(亿)"}
         }
     }
