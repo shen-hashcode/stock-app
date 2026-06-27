@@ -1140,6 +1140,7 @@ def query_order_status(order_no: str, user_id: int, db: Session = Depends(get_db
 @app.post("/api/pay/callback")
 async def wechat_pay_callback(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """微信支付回调通知"""
+    logger.info("进入订单回调")
     body = await request.body()
     headers = dict(request.headers)
 
