@@ -1,6 +1,6 @@
 App({
   globalData: {
-    baseUrl: 'http://121.40.124.210:8000',
+    baseUrl: 'https://7d10ca8e.r25.cpolar.top',
     userId: null
   },
 
