@@ -11,6 +11,19 @@
     </view>
   </view>
 
+  <!-- 订阅默认策略 CTA -->
+  <view class="subscribe-cta" bindtap="goSubscribe">
+    <view class="subscribe-cta-glow"></view>
+    <view class="subscribe-cta-left">
+      <view class="subscribe-cta-icon">◈</view>
+      <view class="subscribe-cta-info">
+        <text class="subscribe-cta-title">订阅内置策略</text>
+        <text class="subscribe-cta-sub">解锁每日内置策略结果 · 有效期一个月</text>
+      </view>
+    </view>
+    <view class="subscribe-cta-arrow">›</view>
+  </view>
+
   <!-- 热门策略区 -->
   <view class="section">
     <view class="section-header">

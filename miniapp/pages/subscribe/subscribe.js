@@ -6,7 +6,14 @@ Page({
     packages: [],
     subscription: null,
     loading: true,
-    paying: false
+    paying: false,
+    filterPackageId: null
+  },
+
+  onLoad(options) {
+    if (options && options.package_id) {
+      this.setData({ filterPackageId: parseInt(options.package_id, 10) })
+    }
   },
 
   onShow() {
@@ -20,8 +27,12 @@ Page({
       get('/api/subscription/packages'),
       get(`/api/subscription/status?user_id=${app.globalData.userId}`)
     ]).then(([pkgRes, statusRes]) => {
+      let packages = pkgRes.code === 0 ? pkgRes.data : []
+      if (this.data.filterPackageId) {
+        packages = packages.filter(p => p.id === this.data.filterPackageId)
+      }
       this.setData({
-        packages: pkgRes.code === 0 ? pkgRes.data : [],
+        packages,
         subscription: statusRes.code === 0 ? statusRes.data : null,
         loading: false
       })

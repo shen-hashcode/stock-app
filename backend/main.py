@@ -285,44 +285,115 @@ async def create_custom_strategy(
     """
     用户提交自然语言描述的自定义策略。
 
-    当前实现：仅入库并通知管理员，由管理员人工编写脚本后再启用。
-    （未自动调用 LLM 生成脚本，避免无人审核的代码直接进入执行链路。）
+    流程：
+    - 已有有效定制订阅且配额充足：直接创建策略，一对一关联到该订阅。
+    - 否则：创建订阅订单 + 策略（一对一），返回支付参数，由前端拉起支付。
+    - 定制订阅配额已满：返回 code 3。
+
+    策略脚本（script_code）由管理员后续人工编写，此处不自动调用 LLM。
     """
     from notify import notify_admins_new_strategy
+    from wechat_pay import generate_order_no, create_prepay_order, build_payment_params
 
     try:
-        # 订阅检查
-        _, pkg = get_user_active_subscription(db, user_id)
-        if not pkg:
-            return {"code": 2, "message": "请先订阅套餐后再创建自定义策略"}
+        # 定制套餐（可创建自定义策略的套餐：strategy_limit > 0）
+        custom_pkg = db.query(SubscriptionPackage).filter(
+            SubscriptionPackage.strategy_limit > 0,
+            SubscriptionPackage.is_active == True
+        ).order_by(SubscriptionPackage.sort_order).first()
 
-        # 配额检查
+        sub, pkg = get_user_active_subscription(db, user_id)
         custom_count = db.query(Strategy).filter(
             Strategy.user_id == user_id
         ).count()
-        if custom_count >= pkg.strategy_limit:
+
+        has_custom_sub = bool(sub and pkg and pkg.strategy_limit > 0)
+        quota_available = has_custom_sub and custom_count < pkg.strategy_limit
+
+        user = db.query(User).filter(User.id == user_id).first()
+        user_nickname = user.nickname if user else f"用户{user_id}"
+
+        # 情况1：已有有效定制订阅且配额充足，直接建策略并关联到现有订阅
+        if quota_available:
+            db_strategy = Strategy(
+                user_id=user_id,
+                name=strategy.name,
+                description=strategy.description,
+                subscription_id=sub.id,
+            )
+            db.add(db_strategy)
+            db.commit()
+            db.refresh(db_strategy)
+
+            background_tasks.add_task(
+                notify_admins_new_strategy, user_id, db_strategy.id, strategy.name, user_nickname
+            )
+            return {"code": 0, "data": {"id": db_strategy.id}}
+
+        # 情况2：定制订阅配额已满
+        if has_custom_sub and not quota_available:
             return {"code": 3, "message": f"当前套餐最多创建{pkg.strategy_limit}个自定义策略，已达上限"}
 
-        # 保存策略到数据库（不调用AI生成脚本，由管理员后续处理）
+        # 情况3：无定制订阅，创建订单 + 策略（一对一），返回支付参数
+        if not custom_pkg:
+            return {"code": 1, "message": "定制策略套餐不存在或已下架"}
+
+        if not user:
+            return {"code": 1, "message": "用户不存在"}
+        if not user.openid or user.openid.startswith("phone_"):
+            return {"code": 1, "message": "微信支付需要微信授权登录"}
+
+        # 创建订阅订单（pending）
+        order_no = generate_order_no()
+        subscription = UserSubscription(
+            user_id=user_id,
+            package_id=custom_pkg.id,
+            order_no=order_no,
+            amount_cents=custom_pkg.price_cents,
+            status="pending",
+        )
+        db.add(subscription)
+        db.commit()
+        db.refresh(subscription)
+
+        # 创建策略，一对一关联到该订阅
         db_strategy = Strategy(
             user_id=user_id,
             name=strategy.name,
-            description=strategy.description
+            description=strategy.description,
+            subscription_id=subscription.id,
         )
         db.add(db_strategy)
         db.commit()
         db.refresh(db_strategy)
 
-        # 获取用户昵称
-        user = db.query(User).filter(User.id == user_id).first()
-        user_nickname = user.nickname if user else f"用户{user_id}"
+        # 调微信统一下单
+        result = create_prepay_order(
+            order_no=order_no,
+            amount_cents=custom_pkg.price_cents,
+            description=f"智能选股助手-{custom_pkg.name}",
+            openid=user.openid,
+        )
+        if "error" in result:
+            return {"code": 1, "message": result["error"]}
 
-        # 异步通知管理员
+        subscription.prepay_id = result["prepay_id"]
+        db.commit()
+
+        payment_params = build_payment_params(result["prepay_id"])
+
         background_tasks.add_task(
             notify_admins_new_strategy, user_id, db_strategy.id, strategy.name, user_nickname
         )
 
-        return {"code": 0, "data": {"id": db_strategy.id}}
+        return {
+            "code": 0,
+            "data": {
+                "strategy_id": db_strategy.id,
+                "order_no": order_no,
+                "payment_params": payment_params,
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

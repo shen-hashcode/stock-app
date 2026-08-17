@@ -31,5 +31,9 @@ Page({
         }
       }
     })
+  },
+
+  goSubscribe() {
+    wx.navigateTo({ url: '/pages/subscribe/subscribe?package_id=1' })
   }
 })

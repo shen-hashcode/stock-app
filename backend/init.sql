@@ -26,39 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- ----------------------------------------
--- 策略表：存储用户创建的选股策略
--- ----------------------------------------
-CREATE TABLE IF NOT EXISTS strategies (
-    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '策略唯一标识，自增主键',
-    user_id INT NOT NULL COMMENT '所属用户ID，关联users表',
-    name VARCHAR(100) COMMENT '策略名称',
-    description TEXT COMMENT '策略描述说明',
-    script_code TEXT COMMENT 'AI生成的Python脚本代码',
-    is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用：1=启用, 0=禁用',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，修改时自动更新',
-    INDEX idx_strategies_user_id (user_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略表';
-
--- ----------------------------------------
--- 策略结果表：存储策略执行后的筛选结果
--- ----------------------------------------
-CREATE TABLE IF NOT EXISTS strategy_results (
-    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '结果唯一标识，自增主键',
-    strategy_id INT NOT NULL COMMENT '所属策略ID，关联strategies表',
-    user_id INT COMMENT '所属用户ID，关联users表',
-    run_date VARCHAR(20) COMMENT '执行日期，格式：YYYY-MM-DD',
-    stocks_json TEXT COMMENT '筛选结果，JSON数组格式',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    INDEX idx_strategy_results_strategy_id (strategy_id),
-    INDEX idx_strategy_results_user_id (user_id),
-    INDEX idx_strategy_results_date (strategy_id, run_date),
-    FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略结果表';
-
--- ----------------------------------------
 -- 订阅套餐表：定义可购买的套餐
 -- ----------------------------------------
 CREATE TABLE IF NOT EXISTS subscription_packages (
@@ -75,8 +42,8 @@ CREATE TABLE IF NOT EXISTS subscription_packages (
 
 -- 初始套餐数据
 INSERT INTO subscription_packages (name, description, price_cents, duration_days, strategy_limit, sort_order) VALUES
-('内置策略套餐', '查看每日热门策略结果，不可创建自定义策略', 990, 30, 0, 1),
-('定制策略套餐', '可创建1个自定义策略，同时可查看每日热门策略结果', 2990, 30, 1, 2);
+('内置策略套餐', '查看每日热门策略结果，不可创建自定义策略', 1, 30, 0, 1),
+('定制策略套餐', '可创建1个自定义策略，同时可查看每日热门策略结果', 1, 30, 1, 2);
 
 -- ----------------------------------------
 -- 用户订阅记录表：记录用户的订阅订单
@@ -100,3 +67,39 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (package_id) REFERENCES subscription_packages(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户订阅记录表';
+
+-- ----------------------------------------
+-- 策略表：存储用户创建的选股策略
+-- ----------------------------------------
+CREATE TABLE IF NOT EXISTS strategies (
+    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '策略唯一标识，自增主键',
+    user_id INT NOT NULL COMMENT '所属用户ID，关联users表',
+    subscription_id INT COMMENT '关联的订阅记录ID，一对一关联user_subscriptions表',
+    name VARCHAR(100) COMMENT '策略名称',
+    description TEXT COMMENT '策略描述说明',
+    script_code TEXT COMMENT 'AI生成的Python脚本代码',
+    is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用：1=启用, 0=禁用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，修改时自动更新',
+    INDEX idx_strategies_user_id (user_id),
+    UNIQUE KEY uk_strategies_subscription_id (subscription_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (subscription_id) REFERENCES user_subscriptions(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略表';
+
+-- ----------------------------------------
+-- 策略结果表：存储策略执行后的筛选结果
+-- ----------------------------------------
+CREATE TABLE IF NOT EXISTS strategy_results (
+    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '结果唯一标识，自增主键',
+    strategy_id INT NOT NULL COMMENT '所属策略ID，关联strategies表',
+    user_id INT COMMENT '所属用户ID，关联users表',
+    run_date VARCHAR(20) COMMENT '执行日期，格式：YYYY-MM-DD',
+    stocks_json TEXT COMMENT '筛选结果，JSON数组格式',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    INDEX idx_strategy_results_strategy_id (strategy_id),
+    INDEX idx_strategy_results_user_id (user_id),
+    INDEX idx_strategy_results_date (strategy_id, run_date),
+    FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='策略结果表';

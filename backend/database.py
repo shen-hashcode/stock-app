@@ -146,7 +146,10 @@ class Strategy(Base):
     
     # 用户ID
     user_id = Column(Integer, index=True)
-    
+
+    # 关联的订阅记录ID（一对一，一个订阅对应一个策略）
+    subscription_id = Column(Integer, unique=True, index=True)
+
     # 策略名称
     name = Column(String(100))
     

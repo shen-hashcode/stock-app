@@ -5,7 +5,8 @@ Page({
   data: {
     strategies: [],
     customName: '',
-    customDesc: ''
+    customDesc: '',
+    paying: false
   },
 
   onShow() {
@@ -46,7 +47,10 @@ Page({
       return
     }
 
-    wx.showLoading({ title: '生成中...' })
+    if (this.data.paying) return
+
+    this.setData({ paying: true })
+    wx.showLoading({ title: '创建中...' })
 
     post(`/api/strategies/custom?user_id=${app.globalData.userId}`, {
       name: customName,
@@ -54,21 +58,33 @@ Page({
     }).then(res => {
       wx.hideLoading()
       if (res.code === 0) {
-        wx.showToast({ title: '创建成功', icon: 'success' })
-        this.setData({ customName: '', customDesc: '' })
-        this.loadStrategies()
-      } else if (res.code === 2) {
-        wx.showModal({
-          title: '需要订阅',
-          content: '请先订阅套餐后再创建自定义策略',
-          confirmText: '去订阅',
-          success: (modalRes) => {
-            if (modalRes.confirm) {
-              wx.navigateTo({ url: '/pages/subscribe/subscribe' })
+        const data = res.data || {}
+        if (data.payment_params) {
+          const params = data.payment_params
+          wx.requestPayment({
+            timeStamp: params.timeStamp,
+            nonceStr: params.nonceStr,
+            package: params.package,
+            signType: params.signType,
+            paySign: params.paySign,
+            success: () => {
+              this.pollStrategyOrder(data.order_no)
+            },
+            fail: (err) => {
+              console.error('wx.requestPayment 失败:', JSON.stringify(err))
+              this.setData({ paying: false })
+              const msg = (err && err.errMsg) || '支付失败'
+              wx.showToast({ title: msg, icon: 'none', duration: 3000 })
             }
-          }
-        })
+          })
+        } else {
+          this.setData({ paying: false })
+          wx.showToast({ title: '创建成功', icon: 'success' })
+          this.setData({ customName: '', customDesc: '' })
+          this.loadStrategies()
+        }
       } else if (res.code === 3) {
+        this.setData({ paying: false })
         wx.showModal({
           title: '配额已满',
           content: res.message || '当前套餐策略数量已达上限',
@@ -76,16 +92,50 @@ Page({
           cancelText: '知道了',
           success: (modalRes) => {
             if (modalRes.confirm) {
-              wx.navigateTo({ url: '/pages/subscribe/subscribe' })
+              wx.navigateTo({ url: '/pages/subscribe/subscribe?package_id=2' })
             }
           }
         })
       } else {
+        this.setData({ paying: false })
         wx.showToast({ title: res.message || '创建失败', icon: 'none' })
       }
     }).catch(() => {
       wx.hideLoading()
+      this.setData({ paying: false })
       wx.showToast({ title: '网络错误', icon: 'none' })
     })
+  },
+
+  pollStrategyOrder(orderNo) {
+    let retries = 0
+    const maxRetries = 10
+
+    const check = () => {
+      get(`/api/subscription/order/${orderNo}?user_id=${app.globalData.userId}`).then(res => {
+        if (res.code === 0 && res.data.status === 'paid') {
+          this.setData({ paying: false, customName: '', customDesc: '' })
+          wx.showToast({ title: '订阅成功', icon: 'success' })
+          this.loadStrategies()
+          return
+        }
+        if (retries < maxRetries) {
+          retries++
+          setTimeout(check, 1500)
+        } else {
+          this.setData({ paying: false })
+          wx.showToast({ title: '支付确认中，请稍后刷新', icon: 'none' })
+        }
+      }).catch(() => {
+        if (retries < maxRetries) {
+          retries++
+          setTimeout(check, 1500)
+        } else {
+          this.setData({ paying: false })
+        }
+      })
+    }
+
+    check()
   }
 })
