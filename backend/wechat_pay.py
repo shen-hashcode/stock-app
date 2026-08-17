@@ -167,6 +167,21 @@ def build_payment_params(prepay_id: str) -> dict:
     }
 
 
+def _decrypt_certificate(resource: dict) -> str:
+    """AES-256-GCM 解密平台证书，返回 PEM 字符串"""
+    try:
+        ciphertext = base64.b64decode(resource["ciphertext"])
+        nonce = resource["nonce"].encode("utf-8")
+        associated_data = resource.get("associated_data", "").encode("utf-8")
+        key = API_KEY_V3.encode("utf-8")
+        aesgcm = AESGCM(key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, associated_data)
+        return plaintext.decode("utf-8")
+    except Exception as e:
+        logger.error(f"解密平台证书失败: {e}")
+        return ""
+
+
 def _download_platform_certs() -> bool:
     """从微信支付API下载平台证书并缓存"""
     url_path = "/v3/certificates"
